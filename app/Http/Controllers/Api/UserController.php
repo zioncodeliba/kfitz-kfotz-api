@@ -19,7 +19,7 @@ class UserController extends Controller
             })
             ->whereDoesntHave('merchant');
 
-        $roleFilterParam = $request->query('roles', 'user');
+        $roleFilterParam = $request->query('roles', '*');
         if ($roleFilterParam !== '*') {
             $roleNames = array_filter(array_map('trim', explode(',', $roleFilterParam)));
             if (empty($roleNames)) {
@@ -34,7 +34,8 @@ class UserController extends Controller
         if ($search = trim((string) $request->query('search', ''))) {
             $query->where(function ($searchQuery) use ($search) {
                 $searchQuery->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -63,6 +64,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|min:2',
             'email' => 'required|email|unique:users,email|max:255',
+            'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'password_confirmation' => 'required|same:password',
         ], [
@@ -119,6 +121,7 @@ class UserController extends Controller
                 'max:255',
                 Rule::unique('users')->ignore($id),
             ],
+            'phone' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'password_confirmation' => 'required_with:password|same:password',
         ], [

@@ -270,7 +270,7 @@
 								"value": "Bearer {{admin_token}}"
 							}
 						],
-						"description": "Loads only non-merchant customers. Supports optional query params: `search`, `roles` (comma list, default `user`), `per_page`, `sort` (`name`, `email`, `created_at`, `orders_count`), and `direction` (`asc`|`desc`).",
+						"description": "Loads only non-merchant customers. Supports optional query params: `search` (matches name/email/phone), `roles` (comma list, default `*` for all non-merchant roles), `per_page`, `sort` (`name`, `email`, `created_at`, `orders_count`), and `direction` (`asc`|`desc`).",
 						"url": {
 							"raw": "{{base_url}}/api/users?search=john&per_page=10&sort=created_at&direction=desc",
 							"host": [
@@ -321,7 +321,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"New User\",\n    \"email\": \"newuser@example.com\",\n    \"password\": \"Password123\",\n    \"password_confirmation\": \"Password123\"\n}"
+							"raw": "{\n    \"name\": \"New User\",\n    \"email\": \"newuser@example.com\",\n    \"phone\": \"+972501234567\",\n    \"password\": \"Password123\",\n    \"password_confirmation\": \"Password123\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/users",
@@ -375,7 +375,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated User Name\",\n    \"email\": \"updated@example.com\"\n}"
+							"raw": "{\n    \"name\": \"Updated User Name\",\n    \"email\": \"updated@example.com\",\n    \"phone\": \"+972509876543\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/users/1",

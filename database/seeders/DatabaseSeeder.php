@@ -10,11 +10,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Default roles
-        $roles = ['admin', 'user', 'seller', 'viewer'];
-        foreach ($roles as $roleName) {
-            Role::firstOrCreate(['name' => $roleName]);
-        }
+        // Ensure base roles exist
+        $this->call(RoleSeeder::class);
 
         // Example admin user (existing)
         $adminUser = User::firstOrCreate(

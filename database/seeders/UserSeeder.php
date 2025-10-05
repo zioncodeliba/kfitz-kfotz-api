@@ -11,13 +11,6 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Ensure base roles exist
-        $roles = ['admin', 'user', 'seller', 'viewer'];
-        foreach ($roles as $r) {
-            Role::firstOrCreate(['name' => $r]);
-        }
-
-        // Map role name -> id
         $roleIdByName = Role::pluck('id', 'name');
 
         // Demo users
@@ -26,31 +19,36 @@ class UserSeeder extends Seeder
                 'name'  => 'Admin User',
                 'email' => 'admin@example.com',
                 'password' => '12345678',
+                'phone' => '+972500000001',
                 'roles' => ['admin'],
             ],
             [
                 'name'  => 'Primary Seller',
                 'email' => 'seller@example.com',
                 'password' => '12345678',
-                'roles' => ['seller'],
+                'phone' => '+972500000002',
+                'roles' => ['merchant'],
             ],
             [
                 'name'  => 'Catalog Viewer',
                 'email' => 'viewer@example.com',
                 'password' => '12345678',
+                'phone' => '+972500000003',
                 'roles' => ['viewer'],
             ],
             [
                 'name'  => 'Regular User One',
                 'email' => 'user1@example.com',
                 'password' => '12345678',
+                'phone' => '+972500000004',
                 'roles' => ['user'],
             ],
             [
                 'name'  => 'Ops Manager',
                 'email' => 'ops@example.com',
                 'password' => '12345678',
-                'roles' => ['seller','viewer'], // multi-role example
+                'phone' => '+972500000005',
+                'roles' => ['merchant','viewer'], // multi-role example
             ],
         ];
 
@@ -61,8 +59,13 @@ class UserSeeder extends Seeder
                 [
                     'name'     => $u['name'],
                     'password' => Hash::make($u['password']),
+                    'phone'    => $u['phone'] ?? null,
                 ]
             );
+
+            if (($u['phone'] ?? null) && $user->phone !== $u['phone']) {
+                $user->update(['phone' => $u['phone']]);
+            }
 
             // Resolve role IDs
             $roleIds = collect($u['roles'])
