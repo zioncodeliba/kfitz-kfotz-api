@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # אם קיימים קבצים/תיקיות ב-root (למעט public) תן להם לעבור
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # שלח הכל ל-public/index.php
+    RewriteRule ^ public/index.php [L]
+</IfModule>

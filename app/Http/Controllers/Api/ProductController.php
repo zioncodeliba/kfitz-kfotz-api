@@ -1,0 +1,169 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Traits\ApiResponse;
+use App\Models\Product;
+use App\Models\Category;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+class ProductController extends Controller
+{
+    use ApiResponse;
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(Request $request)
+    {
+        $query = Product::with(['category']);
+
+        // Filter by category
+        if ($request->has('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Filter by active status
+        if ($request->has('active')) {
+            $query->where('is_active', $request->boolean('active'));
+        }
+
+        // Filter by featured
+        if ($request->has('featured')) {
+            $query->where('is_featured', $request->boolean('featured'));
+        }
+
+        // Filter by stock status
+        if ($request->has('in_stock')) {
+            if ($request->boolean('in_stock')) {
+                $query->inStock();
+            } else {
+                $query->where('stock_quantity', '<=', 0);
+            }
+        }
+
+        // Filter by low stock
+        if ($request->has('low_stock')) {
+            $query->lowStock();
+        }
+
+        // Search by name or description
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        $products = $query->paginate($request->get('per_page', 15));
+
+        return $this->successResponse($products);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'sku' => 'required|string|unique:products,sku',
+            'price' => 'required|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'required|integer|min:0',
+            'min_stock_alert' => 'integer|min:0',
+            'category_id' => 'required|exists:categories,id',
+            'is_active' => 'boolean',
+            'is_featured' => 'boolean',
+            'images' => 'nullable|array',
+            'variations' => 'nullable|array',
+            'weight' => 'nullable|string',
+            'dimensions' => 'nullable|string',
+        ]);
+
+        $product = Product::create($request->all());
+
+        return $this->createdResponse($product->load('category'), 'Product created successfully');
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id)
+    {
+        $product = Product::with(['category'])->findOrFail($id);
+
+        return $this->successResponse($product);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, string $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'sku' => 'sometimes|required|string|unique:products,sku,' . $id,
+            'price' => 'sometimes|required|numeric|min:0',
+            'sale_price' => 'nullable|numeric|min:0',
+            'stock_quantity' => 'sometimes|required|integer|min:0',
+            'min_stock_alert' => 'integer|min:0',
+            'category_id' => 'sometimes|required|exists:categories,id',
+            'is_active' => 'boolean',
+            'is_featured' => 'boolean',
+            'images' => 'nullable|array',
+            'variations' => 'nullable|array',
+            'weight' => 'nullable|string',
+            'dimensions' => 'nullable|string',
+        ]);
+
+        $product->update($request->all());
+
+        return $this->successResponse($product->load('category'), 'Product updated successfully');
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id)
+    {
+        $product = Product::findOrFail($id);
+        $product->delete();
+
+        return $this->successResponse(null, 'Product deleted successfully');
+    }
+
+    /**
+     * Get featured products
+     */
+    public function featured()
+    {
+        $products = Product::with('category')
+            ->featured()
+            ->active()
+            ->inStock()
+            ->get();
+
+        return $this->successResponse($products);
+    }
+
+    /**
+     * Get low stock products
+     */
+    public function lowStock()
+    {
+        $products = Product::with('category')
+            ->lowStock()
+            ->get();
+
+        return $this->successResponse($products);
+    }
+}
