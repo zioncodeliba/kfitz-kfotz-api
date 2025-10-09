@@ -23,7 +23,9 @@ Route::get('/categories/tree', [CategoryController::class, 'tree']);
 Route::get('/categories/{id}', [CategoryController::class, 'show']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/featured', [ProductController::class, 'featured']);
-Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/products/{id}', [ProductController::class, 'show'])
+    ->whereNumber('id');
+Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
 
 // Email verification routes
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
@@ -74,9 +76,11 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     
     // Product management (admin only)
     Route::post('/products', [ProductController::class, 'store']);
-    Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    // Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
+    Route::put('/products/{id}', [ProductController::class, 'update'])
+        ->whereNumber('id');
+    Route::delete('/products/{id}', [ProductController::class, 'destroy'])
+        ->whereNumber('id');
     
     // Shipping carrier management (admin only)
     Route::get('/shipping-carriers', [ShippingCarrierController::class, 'index']);
@@ -137,4 +141,3 @@ Route::post('/shipping-carriers/{id}/calculate-cost', [ShippingCarrierController
 
 // Public order shipping calculation
 Route::post('/orders/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);
-

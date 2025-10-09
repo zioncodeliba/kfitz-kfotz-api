@@ -143,6 +143,17 @@ class ProductSeeder extends Seeder
             ],
         ];
 
+        $lowStockOverrides = [
+            'ELEC-TV-55-001'   => ['stock_quantity' => 5, 'min_stock_alert' => 12],
+            'CLOT-JEANS-002'   => ['stock_quantity' => 3, 'min_stock_alert' => 10],
+            'PHN-IP15P-002'    => ['stock_quantity' => 4, 'min_stock_alert' => 9],
+            'HK-AIRF-002'      => ['stock_quantity' => 2, 'min_stock_alert' => 8],
+            'FUR-SOFA3-001'    => ['stock_quantity' => 1, 'min_stock_alert' => 5],
+            'FIT-RB-002'       => ['stock_quantity' => 6, 'min_stock_alert' => 12],
+            'LAP-GAME16-002'   => ['stock_quantity' => 4, 'min_stock_alert' => 9],
+            'CAMP-TENT2-001'   => ['stock_quantity' => 3, 'min_stock_alert' => 7],
+        ];
+
         foreach ($catalog as $categoryName => $items) {
             $categoryId = Category::where('name', $categoryName)->value('id');
             if (!$categoryId) {
@@ -152,6 +163,13 @@ class ProductSeeder extends Seeder
 
             foreach ($items as [$name, $sku, $price, $sale, $imgQuery]) {
                 $img = $this->productImageUrl($sku, $imgQuery);
+                $stockQuantity = $sale ? 60 : 100;
+                $minStockAlert = 8;
+
+                if (isset($lowStockOverrides[$sku])) {
+                    $stockQuantity = $lowStockOverrides[$sku]['stock_quantity'];
+                    $minStockAlert = $lowStockOverrides[$sku]['min_stock_alert'];
+                }
 
                 Product::updateOrCreate(
                     ['sku' => $sku],
@@ -160,8 +178,8 @@ class ProductSeeder extends Seeder
                         'description'     => $this->shortDescription($name, $categoryName),
                         'price'           => $price,
                         'sale_price'      => $sale,
-                        'stock_quantity'  => $sale ? 60 : 100,
-                        'min_stock_alert' => 8,
+                        'stock_quantity'  => $stockQuantity,
+                        'min_stock_alert' => $minStockAlert,
                         'category_id'     => $categoryId,
                         'is_active'       => true,
                         'is_featured'     => in_array($categoryName, ['Electronics','Smartphones','Laptops','Appliances']) ? 1 : 0,

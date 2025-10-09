@@ -283,13 +283,13 @@ class OrderController extends Controller
         }
 
         $stats = [
-            'total_orders' => $query->count(),
-            'pending_orders' => $query->where('status', 'pending')->count(),
-            'processing_orders' => $query->where('status', 'processing')->count(),
-            'shipped_orders' => $query->where('status', 'shipped')->count(),
-            'delivered_orders' => $query->where('status', 'delivered')->count(),
-            'total_revenue' => $query->where('payment_status', 'paid')->sum('total'),
-            'pending_payments' => $query->where('payment_status', 'pending')->sum('total'),
+            'total_orders' => (clone $query)->count(),
+            'pending_orders' => (clone $query)->where('status', 'pending')->count(),
+            'processing_orders' => (clone $query)->where('status', 'processing')->count(),
+            'shipped_orders' => (clone $query)->where('status', 'shipped')->count(),
+            'delivered_orders' => (clone $query)->where('status', 'delivered')->count(),
+            'total_revenue' => (clone $query)->where('payment_status', 'paid')->sum('total'),
+            'pending_payments' => (clone $query)->where('payment_status', 'pending')->sum('total'),
         ];
 
         return $this->successResponse($stats);

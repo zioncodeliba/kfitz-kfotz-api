@@ -480,6 +480,148 @@
 			]
 		},
 		{
+			"name": "Merchant Management (Admin Only)",
+			"item": [
+				{
+					"name": "List Merchants",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Returns merchants with business info, contact details, status, and account stats. Supports optional query params: `search` (business name/phone/id), `status` (`active`,`pending`,`suspended`), `verification_status` (`pending`,`verified`,`rejected`), and `per_page`.",
+						"url": {
+							"raw": "{{base_url}}/api/merchants?search=store&status=active&verification_status=verified&per_page=10",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchants"
+							],
+							"query": [
+								{"key": "search", "value": "store"},
+								{"key": "status", "value": "active"},
+								{"key": "verification_status", "value": "verified"},
+								{"key": "per_page", "value": "10"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Merchant",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"user_id\": 5,\n    \"business_name\": \"סטודיו לדיגיטל בע\"\"ם\",\n    \"business_id\": \"515123456\",\n    \"phone\": \"03-5556677\",\n    \"website\": \"https://studio.example\",\n    \"description\": \"סוכנות דיגיטל ושיווק\",\n    \"address\": {\n        \"name\": \"סטודיו דיגיטל\",\n        \"address\": \"אבן גבירול 10\",\n        \"city\": \"תל אביב\",\n        \"zip\": \"6400000\",\n        \"phone\": \"03-5556677\"\n    },\n    \"commission_rate\": 12,\n    \"monthly_fee\": 250,\n    \"credit_limit\": 10000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/merchants",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchants"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Merchant Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Returns a merchant including user contact, current stats (monthly revenue/orders, previous month comparison, balance), and related orders.",
+						"url": {
+							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchants",
+								"{{merchant_id}}"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Merchant",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"business_name\": \"אוברלייט טכנולוגיות\",\n    \"status\": \"active\",\n    \"verification_status\": \"verified\",\n    \"commission_rate\": 9.5,\n    \"monthly_fee\": 300,\n    \"credit_limit\": 12000,\n    \"address\": {\n        \"name\": \"סניף ראשי\",\n        \"address\": \"החרושת 5\",\n        \"city\": \"ראשון לציון\",\n        \"zip\": \"7530000\",\n        \"phone\": \"03-7778899\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchants",
+								"{{merchant_id}}"
+							]
+						}
+					}
+				},
+				{
+					"name": "Delete Merchant",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchants",
+								"{{merchant_id}}"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
 			"name": "Role Management (Admin Only)",
 			"item": [
 				{
@@ -1249,6 +1391,152 @@
 								"api",
 								"products",
 								"low-stock"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "נתוני דשבורד",
+			"item": [
+				{
+					"name": "סטטיסטיקות הזמנות",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/orders/dashboard/stats",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"dashboard",
+								"stats"
+							]
+						}
+					}
+				},
+				{
+					"name": "הזמנות אחרונות",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/orders?per_page=5&sort=created_at&direction=desc",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders"
+							],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "5"
+								},
+								{
+									"key": "sort",
+									"value": "created_at"
+								},
+								{
+									"key": "direction",
+									"value": "desc"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "מוצרים במלאי נמוך",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/products/low-stock",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"products",
+								"low-stock"
+							]
+						}
+					}
+				},
+				{
+					"name": "משלוחים בתהליך",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/shipments?status=in_transit",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"shipments"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "in_transit"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "הזמנות בהמתנה",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/orders/status/pending?per_page=5",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"status",
+								"pending"
+							],
+							"query": [
+								{
+									"key": "per_page",
+									"value": "5"
+								}
 							]
 						}
 					}
