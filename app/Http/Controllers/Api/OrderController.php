@@ -659,8 +659,9 @@ class OrderController extends Controller
         $user = $request->user();
 
         $query = Shipment::with(['order.items.product', 'order.user', 'order.merchant', 'carrier'])
+            ->whereIn('status', Shipment::ACTIVE_STATUSES)
             ->whereHas('order', function ($orderQuery) {
-                $orderQuery->whereIn('status', ['shipped', 'delivered']);
+                $orderQuery->where('status', Order::STATUS_SHIPPED);
             });
 
         if ($user->hasRole('admin')) {
@@ -696,6 +697,51 @@ class OrderController extends Controller
         $shipments = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
         return $this->successResponse($shipments, 'Orders waiting for shipment retrieved successfully');
+    }
+
+    public function closedOrders(Request $request)
+    {
+        $user = $request->user();
+
+        $query = Shipment::with(['order.items.product', 'order.user', 'order.merchant', 'carrier'])
+            ->whereIn('status', Shipment::FINAL_STATUSES)
+            ->whereHas('order', function ($orderQuery) {
+                $orderQuery->where('status', Order::STATUS_DELIVERED);
+            });
+
+        if ($user->hasRole('admin')) {
+            // Admin can see all closed shipments
+        } elseif ($user->hasRole('merchant')) {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('merchant_id', $user->id);
+            });
+        } elseif ($user->hasRole('agent')) {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('agent_id', $user->id);
+            });
+        } else {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('user_id', $user->id);
+            });
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($shipmentQuery) use ($search) {
+                $shipmentQuery->where('tracking_number', 'like', "%{$search}%")
+                    ->orWhereHas('order', function ($orderQuery) use ($search) {
+                        $orderQuery->where('order_number', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $shipments = $query->orderBy('updated_at', 'desc')->paginate($request->get('per_page', 15));
+
+        return $this->successResponse($shipments, 'Closed orders retrieved successfully');
     }
 
     /**
@@ -902,10 +948,17 @@ class OrderController extends Controller
         $serviceType = $validated['carrier_service_type'] ?? $order->carrier_service_type ?? $order->shipping_method ?? 'regular';
         $normalizedServiceType = $this->normalizeShipmentServiceType($serviceType);
 
+        $destinationCandidate = $validated['default_destination']
+            ?? ($validated['shipping_units'][0]['destination'] ?? null)
+            ?? ($existingShipment?->shipping_units[0]['destination'] ?? null);
+        $normalizedDestination = $this->normalizeShipmentDestination($destinationCandidate);
+
         $sizeCandidate = $validated['default_shipping_size']
             ?? $validated['default_package_type']
             ?? ($validated['shipping_units'][0]['shipping_size'] ?? null)
-            ?? ($validated['shipping_units'][0]['package_type'] ?? null);
+            ?? ($validated['shipping_units'][0]['package_type'] ?? null)
+            ?? ($existingShipment?->shipping_units[0]['shipping_size'] ?? null)
+            ?? ($existingShipment?->shipping_units[0]['package_type'] ?? null);
 
         $packageType = $this->shippingSettingsService->normalizeSize($sizeCandidate);
 
@@ -935,6 +988,49 @@ class OrderController extends Controller
             ?? $order->carrier?->name
             ?? 'Manual';
 
+        $requestedShippingUnits = $validated['shipping_units'] ?? $request->input('shipping_units', []);
+        $shippingUnitsPayload = collect($requestedShippingUnits)
+            ->map(function ($unit) use ($normalizedDestination, $normalizedServiceType, $packageType, $carrier, $carrierName) {
+                $normalizedSize = $this->shippingSettingsService->normalizeSize($unit['shipping_size'] ?? $unit['package_type'] ?? $packageType);
+                $destination = $this->normalizeShipmentDestination($unit['destination'] ?? $normalizedDestination);
+                $serviceTypeNormalized = $this->normalizeShipmentServiceType($unit['service_type'] ?? $normalizedServiceType);
+
+                return [
+                    'destination' => $destination,
+                    'service_type' => $serviceTypeNormalized,
+                    'carrier_id' => $unit['carrier_id'] ?? $carrier?->id,
+                    'carrier_code' => $unit['carrier_code'] ?? $carrier?->code,
+                    'carrier_name' => $unit['carrier_name'] ?? $carrierName,
+                    'shipping_size' => $normalizedSize,
+                    'package_type' => $this->shippingSettingsService->normalizeSize($unit['package_type'] ?? $normalizedSize),
+                    'quantity' => isset($unit['quantity']) ? max(1, (int) $unit['quantity']) : 1,
+                    'price' => isset($unit['price']) ? (float) $unit['price'] : null,
+                    'notes' => $unit['notes'] ?? null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($shippingUnitsPayload)) {
+            if ($existingShipment && is_array($existingShipment->shipping_units) && count($existingShipment->shipping_units) > 0) {
+                $shippingUnitsPayload = $existingShipment->shipping_units;
+            } else {
+                $shippingUnitsPayload = [[
+                    'destination' => $normalizedDestination,
+                    'service_type' => $normalizedServiceType,
+                    'carrier_id' => $carrier?->id,
+                    'carrier_code' => $carrier?->code,
+                    'carrier_name' => $carrierName,
+                    'shipping_size' => $packageType,
+                    'package_type' => $packageType,
+                    'quantity' => 1,
+                    'price' => null,
+                    'notes' => null,
+                ]];
+            }
+        }
+
         return DB::transaction(function () use (
             $order,
             $carrier,
@@ -947,7 +1043,9 @@ class OrderController extends Controller
             $destinationAddress,
             $codPayment,
             $codAmount,
-            $request
+            $request,
+            $shippingUnitsPayload,
+            $codMethod
         ) {
             $shipment = Shipment::firstOrNew(['order_id' => $order->id]);
 
@@ -968,6 +1066,7 @@ class OrderController extends Controller
                 'cod_payment' => $codPayment,
                 'cod_amount' => $codPayment ? $codAmount : null,
                 'cod_method' => $codPayment ? $codMethod : null,
+                'shipping_units' => $shippingUnitsPayload,
                 'notes' => $request->input('shipment_notes'),
             ]);
 
@@ -1000,6 +1099,18 @@ class OrderController extends Controller
             'express' => 'express',
             'regular', 'courier', 'delivery', 'standard' => 'regular',
             default => 'regular',
+        };
+    }
+
+    protected function normalizeShipmentDestination(?string $destination): string
+    {
+        $value = strtolower((string) $destination);
+
+        return match ($value) {
+            'merchant', 'seller' => 'merchant',
+            'merchant-client', 'merchant_client', 'dealer-client', 'reseller-client' => 'merchant-client',
+            'customer', 'client', 'end-customer', 'end_customer' => 'customer',
+            default => 'customer',
         };
     }
 

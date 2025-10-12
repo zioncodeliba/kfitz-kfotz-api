@@ -7,6 +7,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Shipment extends Model
 {
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_PICKED_UP = 'picked_up';
+    public const STATUS_IN_TRANSIT = 'in_transit';
+    public const STATUS_OUT_FOR_DELIVERY = 'out_for_delivery';
+    public const STATUS_DELIVERED = 'delivered';
+    public const STATUS_FAILED = 'failed';
+    public const STATUS_RETURNED = 'returned';
+
+    public const ACTIVE_STATUSES = [
+        self::STATUS_PENDING,
+        self::STATUS_PICKED_UP,
+        self::STATUS_IN_TRANSIT,
+        self::STATUS_OUT_FOR_DELIVERY,
+    ];
+
+    public const FINAL_STATUSES = [
+        self::STATUS_DELIVERED,
+        self::STATUS_RETURNED,
+        self::STATUS_FAILED,
+    ];
+
     protected $fillable = [
         'order_id',
         'tracking_number',
@@ -26,6 +47,7 @@ class Shipment extends Model
         'cod_payment',
         'cod_amount',
         'cod_method',
+        'shipping_units',
         'notes',
         'tracking_events',
         'picked_up_at',
@@ -48,6 +70,7 @@ class Shipment extends Model
         'cod_amount' => 'decimal:2',
         'cod_method' => 'string',
         'cod_payment' => 'boolean',
+        'shipping_units' => 'array',
         'picked_up_at' => 'datetime',
         'in_transit_at' => 'datetime',
         'out_for_delivery_at' => 'datetime',
@@ -132,6 +155,11 @@ class Shipment extends Model
     public function scopeFailed($query)
     {
         return $query->where('status', 'failed');
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', self::ACTIVE_STATUSES);
     }
 
     // Generate tracking number

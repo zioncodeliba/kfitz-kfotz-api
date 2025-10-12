@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('orders', function (Blueprint $table) {
@@ -19,14 +16,15 @@ return new class extends Migration
 
         Schema::table('shipments', function (Blueprint $table) {
             if (!Schema::hasColumn('shipments', 'cod_method')) {
-                $table->string('cod_method', 32)->nullable()->after('cod_payment');
+                $table->string('cod_method', 32)->nullable()->after('cod_amount');
+            }
+
+            if (!Schema::hasColumn('shipments', 'shipping_units')) {
+                $table->json('shipping_units')->nullable()->after('cod_method');
             }
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('orders', function (Blueprint $table) {
@@ -36,6 +34,10 @@ return new class extends Migration
         });
 
         Schema::table('shipments', function (Blueprint $table) {
+            if (Schema::hasColumn('shipments', 'shipping_units')) {
+                $table->dropColumn('shipping_units');
+            }
+
             if (Schema::hasColumn('shipments', 'cod_method')) {
                 $table->dropColumn('cod_method');
             }
