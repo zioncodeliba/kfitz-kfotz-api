@@ -34,6 +34,7 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             UserSeeder::class,
             OrderAndShipmentSeeder::class,
+            SystemAlertSeeder::class,
         ]);
     }
 }

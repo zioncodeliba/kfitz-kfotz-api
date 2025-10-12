@@ -68,7 +68,7 @@
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer {{token}}"
+								"value": "Bearer {{admin_token}}"
 							}
 						],
 						"url": {
@@ -796,7 +796,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2\n        },\n        {\n            \"product_id\": 3,\n            \"quantity\": 1\n        }\n    ],\n    \"shipping_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"billing_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"shipping_type\": \"delivery\",\n    \"shipping_method\": \"regular\",\n    \"cod_payment\": false,\n    \"notes\": \"Please deliver in the morning\"\n}"
+							"raw": "{\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2\n        },\n        {\n            \"product_id\": 3,\n            \"quantity\": 1\n        }\n    ],\n    \"shipping_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"billing_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"shipping_type\": \"delivery\",\n    \"shipping_method\": \"regular\",\n    \"cod_payment\": false,\n    \"notes\": \"Please deliver in the morning\",\n    \"source\": \"online_store\",\n    \"source_reference\": \"WEB-NEW-2025\",\n    \"source_metadata\": {\n        \"campaign\": \"spring_launch\",\n        \"utm_source\": \"facebook\"\n    }\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/orders",
@@ -1536,6 +1536,93 @@
 								{
 									"key": "per_page",
 									"value": "5"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "ביצועי מכירות",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"description": "Retrieves sales totals for the dashboard chart. `range` supports `last_week`, `last_month`, `last_quarter`, `last_year`. You can override with `start_date` and `end_date` (YYYY-MM-DD).",
+						"url": {
+							"raw": "{{base_url}}/api/orders/dashboard/sales-performance?range=last_month",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"dashboard",
+								"sales-performance"
+							],
+							"query": [
+								{
+									"key": "range",
+									"value": "last_month"
+								},
+								{
+									"key": "start_date",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "end_date",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "התראות מערכת (אדמין)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Loads the latest admin system alerts for the dashboard. Supports query params: `limit` (ברירת מחדל 5, עד 50), `include_archived`, `severity[]`, `category[]`.",
+						"url": {
+							"raw": "{{base_url}}/api/admin/dashboard/alerts?limit=5",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"dashboard",
+								"alerts"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "5"
+								},
+								{
+									"key": "include_archived",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "severity[]",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "category[]",
+									"value": "",
+									"disabled": true
 								}
 							]
 						}

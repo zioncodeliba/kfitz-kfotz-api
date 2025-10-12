@@ -13,6 +13,9 @@ class Order extends Model
         'user_id',
         'merchant_id',
         'agent_id',
+        'source',
+        'source_reference',
+        'source_metadata',
         'status',
         'payment_status',
         'subtotal',
@@ -45,6 +48,7 @@ class Order extends Model
         'cod_payment' => 'boolean',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
+        'source_metadata' => 'array',
     ];
 
     // Relationships

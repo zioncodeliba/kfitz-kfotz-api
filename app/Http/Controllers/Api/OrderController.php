@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ShippingCarrier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 
 class OrderController extends Controller
 {
@@ -80,6 +81,9 @@ class OrderController extends Controller
             'shipping_method' => 'required|in:regular,express,pickup',
             'cod_payment' => 'boolean',
             'notes' => 'nullable|string',
+            'source' => 'nullable|string|max:50',
+            'source_reference' => 'nullable|string|max:100',
+            'source_metadata' => 'nullable|array',
         ]);
 
         try {
@@ -113,6 +117,9 @@ class OrderController extends Controller
                 'user_id' => $user->id,
                 'merchant_id' => $user->hasRole('merchant') ? $user->id : null,
                 'agent_id' => $user->hasRole('agent') ? $user->id : null,
+                'source' => $request->input('source', 'manual'),
+                'source_reference' => $request->input('source_reference'),
+                'source_metadata' => $request->input('source_metadata'),
                 'status' => 'pending',
                 'payment_status' => $request->cod_payment ? 'pending' : 'pending',
                 'subtotal' => $subtotal,
@@ -201,11 +208,26 @@ class OrderController extends Controller
             'tracking_number' => 'nullable|string',
             'shipping_company' => 'nullable|string',
             'notes' => 'nullable|string',
+            'source' => 'sometimes|nullable|string|max:50',
+            'source_reference' => 'sometimes|nullable|string|max:100',
+            'source_metadata' => 'sometimes|array',
         ]);
 
-        $order->update($request->only([
-            'status', 'payment_status', 'tracking_number', 'shipping_company', 'notes'
-        ]));
+        $updates = $request->only([
+            'status',
+            'payment_status',
+            'tracking_number',
+            'shipping_company',
+            'notes',
+            'source',
+            'source_reference',
+        ]);
+
+        if ($request->has('source_metadata')) {
+            $updates['source_metadata'] = $request->input('source_metadata');
+        }
+
+        $order->update($updates);
 
         // Update timestamps based on status
         if ($request->has('status')) {
@@ -282,17 +304,224 @@ class OrderController extends Controller
             $query->where('user_id', $user->id);
         }
 
-        $stats = [
-            'total_orders' => (clone $query)->count(),
-            'pending_orders' => (clone $query)->where('status', 'pending')->count(),
-            'processing_orders' => (clone $query)->where('status', 'processing')->count(),
-            'shipped_orders' => (clone $query)->where('status', 'shipped')->count(),
-            'delivered_orders' => (clone $query)->where('status', 'delivered')->count(),
-            'total_revenue' => (clone $query)->where('payment_status', 'paid')->sum('total'),
-            'pending_payments' => (clone $query)->where('payment_status', 'pending')->sum('total'),
+        [$currentStart, $currentEnd] = $this->resolveRangeDates('last_week', Carbon::today());
+        $daysInWindow = $currentStart->diffInDays($currentEnd) + 1;
+        $previousEnd = $currentStart->copy()->subDay()->endOfDay();
+        $previousStart = $previousEnd->copy()->subDays($daysInWindow - 1)->startOfDay();
+
+        $totals = [];
+        $trends = [];
+
+        // Total orders
+        $totals['total_orders'] = (clone $query)->count();
+        $currentOrders = (clone $query)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $previousOrders = (clone $query)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $trends['total_orders'] = $this->buildTrendPayload($currentOrders, $previousOrders);
+
+        // Pending orders
+        $pendingQuery = (clone $query)->where('status', 'pending');
+        $totals['pending_orders'] = (clone $pendingQuery)->count();
+        $currentPending = (clone $pendingQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $previousPending = (clone $pendingQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $trends['pending_orders'] = $this->buildTrendPayload($currentPending, $previousPending);
+
+        // Processing orders
+        $processingQuery = (clone $query)->where('status', 'processing');
+        $totals['processing_orders'] = (clone $processingQuery)->count();
+        $currentProcessing = (clone $processingQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $previousProcessing = (clone $processingQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $trends['processing_orders'] = $this->buildTrendPayload($currentProcessing, $previousProcessing);
+
+        // Shipped orders
+        $shippedQuery = (clone $query)->where('status', 'shipped');
+        $totals['shipped_orders'] = (clone $shippedQuery)->count();
+        $currentShipped = (clone $shippedQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $previousShipped = (clone $shippedQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $trends['shipped_orders'] = $this->buildTrendPayload($currentShipped, $previousShipped);
+
+        // Delivered orders
+        $deliveredQuery = (clone $query)->where('status', 'delivered');
+        $totals['delivered_orders'] = (clone $deliveredQuery)->count();
+        $currentDelivered = (clone $deliveredQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $previousDelivered = (clone $deliveredQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $trends['delivered_orders'] = $this->buildTrendPayload($currentDelivered, $previousDelivered);
+
+        // Total revenue (paid orders)
+        $paidQuery = (clone $query)->where('payment_status', 'paid');
+        $totalRevenue = (float) (clone $paidQuery)->sum('total');
+        $totals['total_revenue'] = round($totalRevenue, 2);
+        $currentRevenue = (float) (clone $paidQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->sum('total');
+        $previousRevenue = (float) (clone $paidQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->sum('total');
+        $trends['total_revenue'] = $this->buildTrendPayload($currentRevenue, $previousRevenue);
+
+        // Pending payments (sum of totals where payment status pending)
+        $pendingPaymentQuery = (clone $query)->where('payment_status', 'pending');
+        $pendingPaymentsTotal = (float) (clone $pendingPaymentQuery)->sum('total');
+        $totals['pending_payments'] = round($pendingPaymentsTotal, 2);
+        $currentPendingPayments = (float) (clone $pendingPaymentQuery)->whereBetween('created_at', [$currentStart, $currentEnd])->sum('total');
+        $previousPendingPayments = (float) (clone $pendingPaymentQuery)->whereBetween('created_at', [$previousStart, $previousEnd])->sum('total');
+        $trends['pending_payments'] = $this->buildTrendPayload($currentPendingPayments, $previousPendingPayments);
+
+        $periodMeta = [
+            'label' => 'last_week',
+            'current_start' => $currentStart->toDateString(),
+            'current_end' => $currentEnd->toDateString(),
+            'previous_start' => $previousStart->toDateString(),
+            'previous_end' => $previousEnd->toDateString(),
         ];
 
-        return $this->successResponse($stats);
+        return $this->successResponse(array_merge($totals, [
+            'trends' => $trends,
+            'period' => $periodMeta,
+        ]));
+    }
+
+    /**
+     * Get sales performance data for dashboard charting.
+     */
+    public function salesPerformance(Request $request)
+    {
+        $user = $request->user();
+        
+        if (!$user->hasRole('admin')) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+
+        $range = $request->query('range', 'last_week');
+        $customStart = $request->query('start_date');
+        $customEnd = $request->query('end_date');
+
+        $today = Carbon::today();
+        $endDate = $customEnd ? Carbon::parse($customEnd)->endOfDay() : $today->copy()->endOfDay();
+        [$defaultStart, $defaultEnd] = $this->resolveRangeDates($range, $endDate->copy());
+        $startDate = $customStart
+            ? Carbon::parse($customStart)->startOfDay()
+            : $defaultStart->startOfDay();
+        $endDate = $customEnd
+            ? Carbon::parse($customEnd)->endOfDay()
+            : $defaultEnd->endOfDay();
+
+        if ($startDate->gt($endDate)) {
+            [$startDate, $endDate] = [$endDate->copy()->startOfDay(), $startDate->copy()->endOfDay()];
+        }
+
+        $daysInRange = $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->endOfDay()) + 1;
+        $previousEnd = $startDate->copy()->subDay()->endOfDay();
+        $previousStart = $previousEnd->copy()->subDays($daysInRange - 1)->startOfDay();
+
+        $baseQuery = Order::query();
+
+        if ($user->hasRole('admin')) {
+            // no restriction
+        } elseif ($user->hasRole('merchant')) {
+            $baseQuery->where('merchant_id', $user->id);
+        } elseif ($user->hasRole('agent')) {
+            $baseQuery->where('agent_id', $user->id);
+        } else {
+            $baseQuery->where('user_id', $user->id);
+        }
+
+        $currentRangeQuery = (clone $baseQuery)->whereBetween('created_at', [$startDate, $endDate]);
+        $previousRangeQuery = (clone $baseQuery)->whereBetween('created_at', [$previousStart, $previousEnd]);
+
+        $currentRevenueQuery = (clone $currentRangeQuery)->where('payment_status', 'paid');
+        $previousRevenueQuery = (clone $previousRangeQuery)->where('payment_status', 'paid');
+
+        $currentRevenue = (clone $currentRevenueQuery)->sum('total');
+        $previousRevenue = (clone $previousRevenueQuery)->sum('total');
+        $ordersCount = (clone $currentRangeQuery)->count();
+
+        $dataset = (clone $currentRevenueQuery)
+            ->selectRaw('DATE(created_at) as date_label, SUM(total) as total_revenue, COUNT(*) as orders_count')
+            ->groupBy('date_label')
+            ->orderBy('date_label')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'date' => $row->date_label,
+                    'total_revenue' => (float) $row->total_revenue,
+                    'orders_count' => (int) $row->orders_count,
+                ];
+            })
+            ->values();
+
+        $difference = $currentRevenue - $previousRevenue;
+        $percentageChange = $previousRevenue > 0
+            ? round(($difference / $previousRevenue) * 100, 2)
+            : ($currentRevenue > 0 ? 100.0 : 0.0);
+
+        $response = [
+            'range' => $customStart || $customEnd ? 'custom' : $range,
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+            'previous_start_date' => $previousStart->toDateString(),
+            'previous_end_date' => $previousEnd->toDateString(),
+            'days_in_range' => $daysInRange,
+            'total_revenue' => round($currentRevenue, 2),
+            'orders_count' => $ordersCount,
+            'previous_total_revenue' => round($previousRevenue, 2),
+            'difference' => round($difference, 2),
+            'percentage_change' => $percentageChange,
+            'dataset' => $dataset,
+        ];
+
+        return $this->successResponse($response);
+    }
+
+    /**
+     * Resolve the start and end dates for a predefined range.
+     */
+    private function resolveRangeDates(string $range, Carbon $referenceEnd): array
+    {
+        $end = $referenceEnd->copy()->endOfDay();
+
+        switch ($range) {
+            case 'last_month':
+                $start = $end->copy()->subDays(29)->startOfDay();
+                break;
+            case 'last_quarter':
+                $start = $end->copy()->subDays(89)->startOfDay();
+                break;
+            case 'last_year':
+                $start = $end->copy()->subDays(364)->startOfDay();
+                break;
+            case 'last_week':
+            default:
+                $start = $end->copy()->subDays(6)->startOfDay();
+                break;
+        }
+
+        return [$start, $end];
+    }
+
+    /**
+     * Build trend payload with difference and percentage change.
+     */
+    private function buildTrendPayload($current, $previous): array
+    {
+        $difference = $current - $previous;
+        $percentage = $previous != 0
+            ? round(($difference / $previous) * 100, 2)
+            : ($current > 0 ? 100.0 : 0.0);
+
+        $formatter = function ($value) {
+            if (is_int($value)) {
+                return $value;
+            }
+
+            if (is_float($value)) {
+                return round($value, 2);
+            }
+
+            return is_numeric($value) ? round((float) $value, 2) : 0;
+        };
+
+        return [
+            'current_period' => $formatter($current),
+            'previous_period' => $formatter($previous),
+            'difference' => $formatter($difference),
+            'percentage_change' => $percentage,
+        ];
     }
 
     /**

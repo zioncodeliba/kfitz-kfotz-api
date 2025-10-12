@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MerchantController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\ShippingCarrierController;
+use App\Http\Controllers\Api\SystemAlertController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -52,6 +53,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::get('/admin/dashboard', function () {
         return response()->json(['message' => 'Welcome, admin']);
     });
+    Route::get('/admin/dashboard/alerts', [SystemAlertController::class, 'index']);
     
     // User management
     Route::get('/users', [UserController::class, 'index']);
@@ -104,6 +106,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
     Route::get('/orders/status/{status}', [OrderController::class, 'byStatus']);
     Route::get('/orders/dashboard/stats', [OrderController::class, 'dashboard']);
+    Route::get('/orders/dashboard/sales-performance', [OrderController::class, 'salesPerformance']);
     Route::post('/orders/{id}/assign-carrier', [OrderController::class, 'assignCarrier']);
     Route::get('/orders/{id}/available-carriers', [OrderController::class, 'getAvailableCarriers']);
     Route::post('/orders/{id}/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);

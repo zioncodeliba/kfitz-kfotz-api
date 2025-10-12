@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Shipment;
 use App\Models\ShippingCarrier;
@@ -19,8 +18,15 @@ class OrderAndShipmentSeeder extends Seeder
         $ordersConfig = [
             [
                 'order_number' => 'SEED-ORD-001',
+                'days_ago' => 2,
                 'customer_email' => 'user1@example.com',
                 'merchant_email' => 'seller@example.com',
+                'source' => 'pos',
+                'source_reference' => 'POS-TLV-001',
+                'source_metadata' => [
+                    'register' => 'TLV-1',
+                    'operator' => 'Dana',
+                ],
                 'status' => 'pending',
                 'payment_status' => 'pending',
                 'shipping_type' => 'delivery',
@@ -37,8 +43,15 @@ class OrderAndShipmentSeeder extends Seeder
             ],
             [
                 'order_number' => 'SEED-ORD-002',
+                'days_ago' => 5,
                 'customer_email' => 'ops@example.com',
                 'merchant_email' => 'seller@example.com',
+                'source' => 'online_store',
+                'source_reference' => 'WEB-7845',
+                'source_metadata' => [
+                    'campaign' => 'retargeting_october',
+                    'utm_source' => 'facebook',
+                ],
                 'status' => 'processing',
                 'payment_status' => 'paid',
                 'shipping_type' => 'delivery',
@@ -62,8 +75,15 @@ class OrderAndShipmentSeeder extends Seeder
             ],
             [
                 'order_number' => 'SEED-ORD-003',
+                'days_ago' => 12,
                 'customer_email' => 'viewer@example.com',
                 'merchant_email' => 'seller@example.com',
+                'source' => 'online_store',
+                'source_reference' => 'WEB-7901',
+                'source_metadata' => [
+                    'campaign' => 'newsletter',
+                    'utm_medium' => 'email',
+                ],
                 'status' => 'shipped',
                 'payment_status' => 'paid',
                 'shipping_type' => 'delivery',
@@ -87,8 +107,15 @@ class OrderAndShipmentSeeder extends Seeder
             ],
             [
                 'order_number' => 'SEED-ORD-004',
+                'days_ago' => 35,
                 'customer_email' => 'user1@example.com',
                 'merchant_email' => 'seller@example.com',
+                'source' => 'marketplace',
+                'source_reference' => 'AMZ-220045',
+                'source_metadata' => [
+                    'marketplace' => 'Amazon',
+                    'country' => 'US',
+                ],
                 'status' => 'delivered',
                 'payment_status' => 'paid',
                 'shipping_type' => 'delivery',
@@ -112,8 +139,14 @@ class OrderAndShipmentSeeder extends Seeder
             ],
             [
                 'order_number' => 'SEED-ORD-005',
+                'days_ago' => 70,
                 'customer_email' => 'ops@example.com',
                 'merchant_email' => 'seller@example.com',
+                'source' => 'manual',
+                'source_reference' => 'IMPORT-PO-1034',
+                'source_metadata' => [
+                    'import_batch' => '2025-Q2-B2B',
+                ],
                 'status' => 'confirmed',
                 'payment_status' => 'pending',
                 'shipping_type' => 'delivery',
@@ -126,6 +159,102 @@ class OrderAndShipmentSeeder extends Seeder
                     ['sku' => 'FUR-SOFA3-001', 'quantity' => 1],
                 ],
                 'shipment' => null,
+            ],
+            [
+                'order_number' => 'SEED-ORD-006',
+                'days_ago' => 120,
+                'customer_email' => 'viewer@example.com',
+                'merchant_email' => 'seller@example.com',
+                'source' => 'marketplace',
+                'source_reference' => 'EBAY-112233',
+                'source_metadata' => [
+                    'marketplace' => 'eBay',
+                    'seller_account' => 'kfitz-global',
+                ],
+                'status' => 'delivered',
+                'payment_status' => 'paid',
+                'shipping_type' => 'delivery',
+                'shipping_method' => 'express',
+                'shipping_cost' => 45.00,
+                'discount' => 20.00,
+                'cod_payment' => false,
+                'notes' => 'Seasonal sale order.',
+                'items' => [
+                    ['sku' => 'CAMP-TENT2-001', 'quantity' => 1],
+                    ['sku' => 'CAMP-SLP0-002', 'quantity' => 2],
+                ],
+                'shipment' => [
+                    'tracking_number' => 'TRK-SEED-6001',
+                    'status' => 'delivered',
+                    'carrier_code' => 'israelpost',
+                    'service_type' => 'express',
+                    'package_type' => 'box',
+                    'shipping_cost' => 45.00,
+                ],
+            ],
+            [
+                'order_number' => 'SEED-ORD-007',
+                'days_ago' => 180,
+                'customer_email' => 'user1@example.com',
+                'merchant_email' => 'seller@example.com',
+                'source' => 'online_store',
+                'source_reference' => 'WEB-6123',
+                'source_metadata' => [
+                    'campaign' => 'fitness_bundle',
+                    'utm_source' => 'google_ads',
+                ],
+                'status' => 'processing',
+                'payment_status' => 'paid',
+                'shipping_type' => 'delivery',
+                'shipping_method' => 'regular',
+                'shipping_cost' => 30.00,
+                'discount' => 5.00,
+                'cod_payment' => false,
+                'notes' => 'Fitness bundle order.',
+                'items' => [
+                    ['sku' => 'FIT-RB-002', 'quantity' => 3],
+                    ['sku' => 'FIT-KB12-003', 'quantity' => 1],
+                ],
+                'shipment' => [
+                    'tracking_number' => 'TRK-SEED-7001',
+                    'status' => 'in_transit',
+                    'carrier_code' => 'ups',
+                    'service_type' => 'regular',
+                    'package_type' => 'box',
+                    'shipping_cost' => 30.00,
+                ],
+            ],
+            [
+                'order_number' => 'SEED-ORD-008',
+                'days_ago' => 310,
+                'customer_email' => 'ops@example.com',
+                'merchant_email' => 'seller@example.com',
+                'source' => 'manual',
+                'source_reference' => 'CSR-ADI',
+                'source_metadata' => [
+                    'csr_name' => 'Adi',
+                    'note' => 'Annual corporate order',
+                ],
+                'status' => 'delivered',
+                'payment_status' => 'paid',
+                'shipping_type' => 'delivery',
+                'shipping_method' => 'regular',
+                'shipping_cost' => 25.00,
+                'discount' => 0,
+                'cod_payment' => false,
+                'notes' => 'Annual procurement order.',
+                'items' => [
+                    ['sku' => 'HK-PAN28-001', 'quantity' => 2],
+                    ['sku' => 'HK-PIL-003', 'quantity' => 3],
+                ],
+                'shipment' => [
+                    'tracking_number' => 'TRK-SEED-8001',
+                    'status' => 'delivered',
+                    'carrier_code' => 'fedex',
+                    'service_type' => 'regular',
+                    'package_type' => 'box',
+                    'shipping_cost' => 25.00,
+                ],
             ],
         ];
 
@@ -182,16 +311,20 @@ class OrderAndShipmentSeeder extends Seeder
             'phone' => '+972-3-555-0101',
         ];
 
+        $seedNow = Carbon::now();
+
         DB::transaction(function () use (
             $ordersConfig,
             $users,
             $products,
             $carriers,
-            $warehouseAddress
+            $warehouseAddress,
+            $seedNow
         ) {
             foreach ($ordersConfig as $orderConfig) {
                 $customer = $users[$orderConfig['customer_email']];
                 $merchant = $users[$orderConfig['merchant_email']];
+                $orderDate = $seedNow->copy()->subDays($orderConfig['days_ago'] ?? 0)->setTime(10, 0, 0);
 
                 $shippingAddress = [
                     'name' => $customer->name,
@@ -229,14 +362,16 @@ class OrderAndShipmentSeeder extends Seeder
 
                 $tax = round($subtotal * 0.17, 2);
                 $total = $subtotal + $tax + $orderConfig['shipping_cost'] - $orderConfig['discount'];
-                $now = Carbon::now();
 
                 $shippedAt = in_array($orderConfig['status'], ['processing', 'shipped', 'delivered'])
-                    ? $now->copy()->subDays(2)
+                    ? $orderDate->copy()->addDays(1)
                     : null;
                 $deliveredAt = $orderConfig['status'] === 'delivered'
-                    ? $now->copy()->subDay()
+                    ? $orderDate->copy()->addDays(3)
                     : null;
+                $orderUpdatedAt = $deliveredAt
+                    ? $deliveredAt->copy()
+                    : ($shippedAt ? $shippedAt->copy() : $orderDate->copy()->addDay());
 
                 $order = Order::updateOrCreate(
                     ['order_number' => $orderConfig['order_number']],
@@ -259,6 +394,9 @@ class OrderAndShipmentSeeder extends Seeder
                         'shipping_company' => null,
                         'carrier_id' => null,
                         'carrier_service_type' => null,
+                        'source' => $orderConfig['source'] ?? 'manual',
+                        'source_reference' => $orderConfig['source_reference'] ?? null,
+                        'source_metadata' => $orderConfig['source_metadata'] ?? null,
                         'shipped_at' => $shippedAt,
                         'delivered_at' => $deliveredAt,
                     ]
@@ -269,19 +407,33 @@ class OrderAndShipmentSeeder extends Seeder
                     $order->items()->create($itemPayload);
                 }
 
+                $order->timestamps = false;
+                $order->created_at = $orderDate;
+                $order->updated_at = $orderUpdatedAt;
+                $order->save();
+                $order->timestamps = true;
+
                 $shipmentConfig = $orderConfig['shipment'];
 
                 if ($shipmentConfig) {
                     $carrier = $carriers[$shipmentConfig['carrier_code']];
 
+                    $shipmentCreatedAt = $orderDate->copy()->addHours(4);
+                    $pickedUpAt = $orderDate->copy()->addDay()->setTime(9, 0, 0);
+                    $inTransitAt = $pickedUpAt->copy()->addDay()->setTime(8, 30, 0);
+                    $outForDeliveryAt = $inTransitAt->copy()->addHours(18);
+                    $deliveredAtTs = $shipmentConfig['status'] === 'delivered'
+                        ? $outForDeliveryAt->copy()->addHours(6)
+                        : null;
+
                     $trackingEvents = [
                         [
-                            'timestamp' => $now->copy()->subDays(3)->toIso8601String(),
+                            'timestamp' => $shipmentCreatedAt->toIso8601String(),
                             'event' => 'Shipment created',
                             'description' => 'Shipment initialized in system',
                         ],
                         [
-                            'timestamp' => $now->copy()->subDays(2)->toIso8601String(),
+                            'timestamp' => $pickedUpAt->toIso8601String(),
                             'event' => 'Picked up',
                             'description' => 'Package collected from warehouse',
                         ],
@@ -289,7 +441,7 @@ class OrderAndShipmentSeeder extends Seeder
 
                     if (in_array($shipmentConfig['status'], ['in_transit', 'out_for_delivery', 'delivered'])) {
                         $trackingEvents[] = [
-                            'timestamp' => $now->copy()->subDay()->toIso8601String(),
+                            'timestamp' => $inTransitAt->toIso8601String(),
                             'event' => 'In transit',
                             'description' => 'Package en route to sorting hub',
                         ];
@@ -297,21 +449,21 @@ class OrderAndShipmentSeeder extends Seeder
 
                     if (in_array($shipmentConfig['status'], ['out_for_delivery', 'delivered'])) {
                         $trackingEvents[] = [
-                            'timestamp' => $now->copy()->subHours(12)->toIso8601String(),
+                            'timestamp' => $outForDeliveryAt->toIso8601String(),
                             'event' => 'Out for delivery',
                             'description' => 'Courier is on the way to the recipient',
                         ];
                     }
 
-                    if ($shipmentConfig['status'] === 'delivered') {
+                    if ($deliveredAtTs) {
                         $trackingEvents[] = [
-                            'timestamp' => $now->copy()->subHours(4)->toIso8601String(),
+                            'timestamp' => $deliveredAtTs->toIso8601String(),
                             'event' => 'Delivered',
                             'description' => 'Package delivered to recipient',
                         ];
                     }
 
-                    Shipment::updateOrCreate(
+                    $shipment = Shipment::updateOrCreate(
                         ['tracking_number' => $shipmentConfig['tracking_number']],
                         [
                             'order_id' => $order->id,
@@ -332,33 +484,47 @@ class OrderAndShipmentSeeder extends Seeder
                             'cod_amount' => null,
                             'notes' => $orderConfig['notes'],
                             'tracking_events' => $trackingEvents,
-                            'picked_up_at' => $now->copy()->subDays(2),
+                            'picked_up_at' => $pickedUpAt,
                             'in_transit_at' => in_array($shipmentConfig['status'], ['in_transit', 'out_for_delivery', 'delivered'])
-                                ? $now->copy()->subDay()
+                                ? $inTransitAt
                                 : null,
                             'out_for_delivery_at' => in_array($shipmentConfig['status'], ['out_for_delivery', 'delivered'])
-                                ? $now->copy()->subHours(12)
+                                ? $outForDeliveryAt
                                 : null,
-                            'delivered_at' => $shipmentConfig['status'] === 'delivered'
-                                ? $now->copy()->subHours(4)
-                                : null,
+                            'delivered_at' => $deliveredAtTs,
                         ]
                     );
 
-                    $order->update([
-                        'tracking_number' => $shipmentConfig['tracking_number'],
-                        'shipping_company' => $carrier->name,
-                        'carrier_id' => $carrier->id,
-                        'carrier_service_type' => $shipmentConfig['service_type'],
-                    ]);
+                    $shipmentUpdatedAt = $deliveredAtTs
+                        ? $deliveredAtTs->copy()
+                        : (in_array($shipmentConfig['status'], ['out_for_delivery'])
+                            ? $outForDeliveryAt->copy()
+                            : (in_array($shipmentConfig['status'], ['in_transit'])
+                                ? $inTransitAt->copy()
+                                : $pickedUpAt->copy()));
+
+                    $shipment->timestamps = false;
+                    $shipment->created_at = $shipmentCreatedAt;
+                    $shipment->updated_at = $shipmentUpdatedAt;
+                    $shipment->save();
+                    $shipment->timestamps = true;
+
+                    $order->tracking_number = $shipmentConfig['tracking_number'];
+                    $order->shipping_company = $carrier->name;
+                    $order->carrier_id = $carrier->id;
+                    $order->carrier_service_type = $shipmentConfig['service_type'];
+                    $order->timestamps = false;
+                    $order->save();
+                    $order->timestamps = true;
                 } else {
                     Shipment::where('order_id', $order->id)->delete();
-                    $order->update([
-                        'tracking_number' => null,
-                        'shipping_company' => null,
-                        'carrier_id' => null,
-                        'carrier_service_type' => null,
-                    ]);
+                    $order->tracking_number = null;
+                    $order->shipping_company = null;
+                    $order->carrier_id = null;
+                    $order->carrier_service_type = null;
+                    $order->timestamps = false;
+                    $order->save();
+                    $order->timestamps = true;
                 }
             }
         });
