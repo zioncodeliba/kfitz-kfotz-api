@@ -7,11 +7,17 @@ use App\Traits\ApiResponse;
 use App\Models\Merchant;
 use App\Models\User;
 use App\Models\Role;
+use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
 
 class MerchantController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(
+        protected ShippingSettingsService $shippingSettingsService
+    ) {
+    }
 
     /**
      * Display a listing of the resource.
@@ -257,5 +263,73 @@ class MerchantController extends Controller
         $merchant->update($request->all());
 
         return $this->successResponse($merchant->load('user'), 'Profile updated successfully');
+    }
+
+    /**
+     * Get shipping settings for a merchant (admin only).
+     */
+    public function getShippingSettings(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->hasRole('admin')) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+        
+        $validated = $request->validate([
+            'merchant_id' => 'required|exists:merchants,id',
+        ]);
+
+        $merchant = Merchant::find($validated['merchant_id']);
+        if (!$merchant) {
+            return $this->notFoundResponse('Merchant not found');
+        }
+
+        return $this->successResponse(
+            $this->shippingSettingsService->buildPayload($merchant),
+            'Shipping settings retrieved successfully'
+        );
+    }
+
+    /**
+     * Update shipping settings for a merchant (admin only).
+     */
+    public function updateShippingSettings(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->hasRole('admin')) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+        
+        $validated = $request->validate([
+            'merchant_id' => 'required|exists:merchants,id',
+            'default_destination' => 'nullable|string|max:100',
+            'default_service_type' => 'nullable|string|max:100',
+            'default_package_type' => 'nullable|string|max:100',
+            'shipping_units' => 'nullable|array',
+            'shipping_units.*.destination' => 'required|string|max:100',
+            'shipping_units.*.service_type' => 'required|string|max:100',
+            'shipping_units.*.carrier_id' => 'nullable|exists:shipping_carriers,id',
+            'shipping_units.*.carrier_code' => 'nullable|string|max:191|exists:shipping_carriers,code',
+            'shipping_units.*.package_type' => 'nullable|string|max:100',
+            'shipping_units.*.quantity' => 'required|integer|min:1|max:999',
+            'shipping_units.*.price' => 'nullable|numeric|min:0',
+            'shipping_units.*.notes' => 'nullable|string',
+        ]);
+
+        $merchant = Merchant::find($validated['merchant_id']);
+        if (!$merchant) {
+            return $this->notFoundResponse('Merchant not found');
+        }
+
+        $merchant->update([
+            'shipping_settings' => $this->shippingSettingsService->prepareForStorage($validated),
+        ]);
+
+        return $this->successResponse(
+            $this->shippingSettingsService->buildPayload($merchant->refresh()),
+            'Shipping settings updated successfully'
+        );
     }
 }

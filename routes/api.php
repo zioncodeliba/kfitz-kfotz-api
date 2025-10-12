@@ -94,12 +94,16 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::delete('/shipping-carriers/{id}', [ShippingCarrierController::class, 'destroy']);
     Route::post('/shipping-carriers/{id}/test-connection', [ShippingCarrierController::class, 'testConnection']);
     Route::post('/shipping-carriers/{id}/calculate-cost', [ShippingCarrierController::class, 'calculateCost']);
+    Route::get('/merchant/shipping-settings', [MerchantController::class, 'getShippingSettings']);
+    Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
     
 });
 
 // Order management (authenticated users)
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/open', [OrderController::class, 'openOrders']);
+    Route::get('/orders/waiting-shipment', [OrderController::class, 'waitingForShipment']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::put('/orders/{id}', [OrderController::class, 'update']);
@@ -109,6 +113,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/orders/dashboard/sales-performance', [OrderController::class, 'salesPerformance']);
     Route::post('/orders/{id}/assign-carrier', [OrderController::class, 'assignCarrier']);
     Route::get('/orders/{id}/available-carriers', [OrderController::class, 'getAvailableCarriers']);
+    Route::get('/orders/{id}/shipping-settings', [OrderController::class, 'getShippingSettings']);
+    Route::put('/orders/{id}/shipping-settings', [OrderController::class, 'updateShippingSettings']);
     Route::post('/orders/{id}/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);
     
     // Merchant management (admin only)

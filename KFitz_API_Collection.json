@@ -622,6 +622,73 @@
 			]
 		},
 		{
+			"name": "Merchant Portal",
+			"item": [
+				{
+					"name": "Get Shipping Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Returns the merchant shipping configuration for the selected merchant (admin only). Provide `merchant_id` as a query param to target the merchant record.",
+						"url": {
+							"raw": "{{base_url}}/api/merchant/shipping-settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchant",
+								"shipping-settings"
+							],
+							"query": [
+								{
+									"key": "merchant_id",
+									"value": "{{merchant_id}}"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Shipping Settings",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"description": "Creates or updates the merchant shipping preferences (admin only). Include `merchant_id` in the payload alongside one or more `shipping_units` entries.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"merchant_id\": {{merchant_id}},\n    \"default_destination\": \"local\",\n    \"default_service_type\": \"regular\",\n    \"default_package_type\": \"box\",\n    \"shipping_units\": [\n        {\n            \"destination\": \"local\",\n            \"service_type\": \"regular\",\n            \"carrier_code\": \"israelpost\",\n            \"package_type\": \"box\",\n            \"quantity\": 1,\n            \"price\": 19.9,\n            \"notes\": \"שליח עד הבית בתוך 2 ימי עסקים\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/merchant/shipping-settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"merchant",
+								"shipping-settings"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
 			"name": "Role Management (Admin Only)",
 			"item": [
 				{
@@ -776,6 +843,57 @@
 							"path": [
 								"api",
 								"orders"
+							]
+						}
+					}
+				},
+				{
+					"name": "Open Orders",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Returns orders whose status is `pending`, `confirmed`, or `processing`. Supports `payment_status`, `date_from`, `date_to`, `search`, and `per_page` query params.",
+						"url": {
+							"raw": "{{base_url}}/api/orders/open",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"open"
+							],
+							"query": [
+								{
+									"key": "payment_status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_from",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "date_to",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "per_page",
+									"value": "",
+									"disabled": true
+								}
 							]
 						}
 					}
@@ -987,6 +1105,105 @@
 								"orders",
 								"1",
 								"available-carriers"
+							]
+						}
+					}
+				},
+				{
+					"name": "Orders Waiting for Shipment",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Returns shipment records whose related orders are in `shipped` or `delivered` status. Optional query params: `status` (shipment status), `search` (order number / tracking number), `per_page`.",
+						"url": {
+							"raw": "{{base_url}}/api/orders/waiting-shipment",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"waiting-shipment"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "per_page",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Order Shipping Settings",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"description": "Loads the shipping configuration context for a specific order, including the merchant defaults, available carrier options, and the order's current selections.",
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}",
+								"shipping-settings"
+							]
+						}
+					}
+				},
+				{
+					"name": "Update Order Shipping Settings",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"description": "Updates the merchant shipping presets and, optionally, overrides carrier selection for the order. When sending `carrier_id`, include `carrier_service_type`.",
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"default_destination\": \"local\",\n    \"default_service_type\": \"express\",\n    \"shipping_units\": [\n        {\n            \"destination\": \"local\",\n            \"service_type\": \"express\",\n            \"carrier_code\": \"israelpost\",\n            \"package_type\": \"box\",\n            \"quantity\": 1,\n            \"price\": 24.9\n        }\n    ],\n    \"carrier_id\": 5,\n    \"carrier_service_type\": \"express\",\n    \"shipping_type\": \"delivery\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"orders",
+								"{{order_id}}",
+								"shipping-settings"
 							]
 						}
 					}
@@ -1645,6 +1862,16 @@
 		{
 			"key": "admin_token",
 			"value": "your_admin_token_here",
+			"type": "string"
+		},
+		{
+			"key": "merchant_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "order_id",
+			"value": "1",
 			"type": "string"
 		}
 	]

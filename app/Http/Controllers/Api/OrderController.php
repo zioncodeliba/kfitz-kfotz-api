@@ -7,6 +7,10 @@ use App\Traits\ApiResponse;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ShippingCarrier;
+use App\Models\Shipment;
+use App\Models\Merchant;
+use App\Services\ShippingSettingsService;
+use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
@@ -14,6 +18,11 @@ use Illuminate\Support\Carbon;
 class OrderController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(
+        protected ShippingSettingsService $shippingSettingsService
+    ) {
+    }
 
     /**
      * Display a listing of the resource.
@@ -64,6 +73,46 @@ class OrderController extends Controller
         $orders = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
         return $this->successResponse($orders);
+    }
+
+    /**
+     * Get open orders (pending/confirmed/processing).
+     */
+    public function openOrders(Request $request)
+    {
+        $user = $request->user();
+        $query = Order::with(['items.product', 'user', 'merchant', 'agent'])
+            ->whereIn('status', ['pending', 'confirmed', 'processing']);
+
+        if ($user->hasRole('admin')) {
+            // Admin can see all open orders
+        } elseif ($user->hasRole('merchant')) {
+            $query->where('merchant_id', $user->id);
+        } elseif ($user->hasRole('agent')) {
+            $query->where('agent_id', $user->id);
+        } else {
+            $query->where('user_id', $user->id);
+        }
+
+        if ($request->has('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        if ($request->has('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        if ($request->has('search')) {
+            $query->where('order_number', 'like', '%' . $request->search . '%');
+        }
+
+        $orders = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+
+        return $this->successResponse($orders, 'Open orders retrieved successfully');
     }
 
     /**
@@ -604,6 +653,191 @@ class OrderController extends Controller
     }
 
     /**
+     * Get orders that are awaiting shipment (based on shipment records).
+     */
+    public function waitingForShipment(Request $request)
+    {
+        $user = $request->user();
+
+        $query = Shipment::with(['order.items.product', 'order.user', 'order.merchant', 'carrier'])
+            ->whereHas('order', function ($orderQuery) {
+                $orderQuery->whereIn('status', ['shipped', 'delivered']);
+            });
+
+        if ($user->hasRole('admin')) {
+            // Admin can see all shipments awaiting delivery
+        } elseif ($user->hasRole('merchant')) {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('merchant_id', $user->id);
+            });
+        } elseif ($user->hasRole('agent')) {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('agent_id', $user->id);
+            });
+        } else {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('user_id', $user->id);
+            });
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($shipmentQuery) use ($search) {
+                $shipmentQuery->where('tracking_number', 'like', "%{$search}%")
+                    ->orWhereHas('order', function ($orderQuery) use ($search) {
+                        $orderQuery->where('order_number', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $shipments = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+
+        return $this->successResponse($shipments, 'Orders waiting for shipment retrieved successfully');
+    }
+
+    /**
+     * Get shipping settings context for a specific order.
+     */
+    public function getShippingSettings(Request $request, string $id)
+    {
+        $order = Order::with(['items', 'carrier'])->findOrFail($id);
+        $user = $request->user();
+
+        if (!$this->canManageOrderShipping($user, $order)) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+
+        $merchant = Merchant::where('user_id', $order->merchant_id)->first();
+        $payload = $this->shippingSettingsService->buildPayload($merchant);
+
+        return $this->successResponse([
+            'order' => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'shipping_type' => $order->shipping_type,
+                'shipping_method' => $order->shipping_method,
+                'shipping_cost' => $order->shipping_cost,
+                'carrier_id' => $order->carrier_id,
+                'carrier_service_type' => $order->carrier_service_type,
+                'weight' => $order->items->sum('weight') ?? 0,
+                'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
+            ],
+            'merchant' => $merchant ? [
+                'id' => $merchant->id,
+                'user_id' => $merchant->user_id,
+                'business_name' => $merchant->business_name,
+            ] : null,
+            'settings' => $payload['settings'],
+            'options' => $payload['options'],
+        ], 'Order shipping settings retrieved successfully');
+    }
+
+    /**
+     * Update shipping settings context for a specific order.
+     */
+    public function updateShippingSettings(Request $request, string $id)
+    {
+        $order = Order::with(['items', 'carrier'])->findOrFail($id);
+        $user = $request->user();
+
+        if (!$this->canManageOrderShipping($user, $order)) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+
+        $validated = $request->validate([
+            'default_destination' => 'nullable|string|max:100',
+            'default_service_type' => 'nullable|string|max:100',
+            'default_package_type' => 'nullable|string|max:100',
+            'shipping_units' => 'nullable|array',
+            'shipping_units.*.destination' => 'required|string|max:100',
+            'shipping_units.*.service_type' => 'required|string|max:100',
+            'shipping_units.*.carrier_id' => 'nullable|exists:shipping_carriers,id',
+            'shipping_units.*.carrier_code' => 'nullable|string|max:191|exists:shipping_carriers,code',
+            'shipping_units.*.package_type' => 'nullable|string|max:100',
+            'shipping_units.*.quantity' => 'required|integer|min:1|max:999',
+            'shipping_units.*.price' => 'nullable|numeric|min:0',
+            'shipping_units.*.notes' => 'nullable|string',
+            'carrier_id' => 'nullable|exists:shipping_carriers,id',
+            'carrier_service_type' => 'required_with:carrier_id|string|max:100',
+            'shipping_type' => 'nullable|in:delivery,pickup',
+            'shipping_method' => 'nullable|string|max:100',
+        ]);
+
+        $merchant = Merchant::where('user_id', $order->merchant_id)->first();
+
+        if ($merchant) {
+            $merchant->update([
+                'shipping_settings' => $this->shippingSettingsService->prepareForStorage(
+                    $validated,
+                    ['carrier_id', 'carrier_service_type', 'shipping_type', 'shipping_method']
+                ),
+            ]);
+        }
+
+        $orderUpdates = collect([
+            'shipping_type' => $validated['shipping_type'] ?? null,
+            'shipping_method' => $validated['shipping_method'] ?? null,
+        ])->filter(fn ($value) => !is_null($value));
+
+        if ($orderUpdates->isNotEmpty()) {
+            $order->update($orderUpdates->all());
+        }
+
+        if (!empty($validated['carrier_id'])) {
+            $carrier = ShippingCarrier::findOrFail($validated['carrier_id']);
+
+            if (!$carrier->isActive()) {
+                return $this->errorResponse('Selected carrier is not active', 422);
+            }
+
+            $serviceType = $validated['carrier_service_type'];
+
+            if (is_array($carrier->service_types) && !in_array($serviceType, $carrier->service_types)) {
+                return $this->errorResponse('Selected service type is not available for this carrier', 422);
+            }
+
+            $order->assignCarrier($carrier, $serviceType);
+
+            $shippingCost = $order->fresh(['items', 'carrier'])->calculateShippingCost();
+
+            $order->update([
+                'shipping_cost' => $shippingCost,
+                'total' => $order->subtotal + $order->tax + $shippingCost - $order->discount,
+            ]);
+        }
+
+        $order->refresh();
+        $merchant?->refresh();
+
+        $payload = $this->shippingSettingsService->buildPayload($merchant);
+
+        return $this->successResponse([
+            'order' => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'shipping_type' => $order->shipping_type,
+                'shipping_method' => $order->shipping_method,
+                'shipping_cost' => $order->shipping_cost,
+                'carrier_id' => $order->carrier_id,
+                'carrier_service_type' => $order->carrier_service_type,
+                'weight' => $order->items->sum('weight') ?? 0,
+                'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
+            ],
+            'merchant' => $merchant ? [
+                'id' => $merchant->id,
+                'user_id' => $merchant->user_id,
+                'business_name' => $merchant->business_name,
+            ] : null,
+            'settings' => $payload['settings'],
+            'options' => $payload['options'],
+        ], 'Order shipping settings updated successfully');
+    }
+
+    /**
      * Calculate shipping cost for order (public)
      */
     public function calculateShippingCost(Request $request, string $id = null)
@@ -647,5 +881,21 @@ class OrderController extends Controller
         }
 
         return $this->successResponse($response);
+    }
+
+    /**
+     * Determine if the authenticated user can manage shipping for the order.
+     */
+    protected function canManageOrderShipping($user, Order $order): bool
+    {
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        if ($user->hasRole('merchant') && $order->merchant_id === $user->id) {
+            return true;
+        }
+
+        return false;
     }
 }
