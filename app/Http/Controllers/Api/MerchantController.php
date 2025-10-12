@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class MerchantController extends Controller
 {
@@ -302,17 +303,21 @@ class MerchantController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
         
+        $sizeOptions = $this->shippingSettingsService->shippingSizeOptions();
+
         $validated = $request->validate([
             'merchant_id' => 'required|exists:merchants,id',
             'default_destination' => 'nullable|string|max:100',
             'default_service_type' => 'nullable|string|max:100',
-            'default_package_type' => 'nullable|string|max:100',
+            'default_shipping_size' => ['nullable', Rule::in($sizeOptions)],
+            'default_package_type' => ['nullable', Rule::in($sizeOptions)],
             'shipping_units' => 'nullable|array',
             'shipping_units.*.destination' => 'required|string|max:100',
             'shipping_units.*.service_type' => 'required|string|max:100',
             'shipping_units.*.carrier_id' => 'nullable|exists:shipping_carriers,id',
             'shipping_units.*.carrier_code' => 'nullable|string|max:191|exists:shipping_carriers,code',
-            'shipping_units.*.package_type' => 'nullable|string|max:100',
+            'shipping_units.*.shipping_size' => ['nullable', Rule::in($sizeOptions)],
+            'shipping_units.*.package_type' => ['nullable', Rule::in($sizeOptions)],
             'shipping_units.*.quantity' => 'required|integer|min:1|max:999',
             'shipping_units.*.price' => 'nullable|numeric|min:0',
             'shipping_units.*.notes' => 'nullable|string',
@@ -324,7 +329,20 @@ class MerchantController extends Controller
         }
 
         $merchant->update([
-            'shipping_settings' => $this->shippingSettingsService->prepareForStorage($validated),
+            'shipping_settings' => $this->shippingSettingsService->prepareForStorage(
+                $validated,
+                [
+                    'merchant_id',
+                    'dispatch_shipment',
+                    'origin_address',
+                    'destination_address',
+                    'carrier_name',
+                    'shipping_cost',
+                    'cod_payment',
+                    'cod_amount',
+                    'shipment_notes',
+                ]
+            ),
         ]);
 
         return $this->successResponse(

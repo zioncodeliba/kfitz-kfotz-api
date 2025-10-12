@@ -86,6 +86,7 @@ class ShipmentController extends Controller
             'shipping_cost' => 'required|numeric|min:0',
             'cod_payment' => 'boolean',
             'cod_amount' => 'nullable|numeric|min:0',
+            'cod_method' => 'nullable|string|max:191',
             'notes' => 'nullable|string',
         ]);
 
@@ -159,6 +160,7 @@ class ShipmentController extends Controller
             'shipping_cost' => 'sometimes|numeric|min:0',
             'cod_payment' => 'boolean',
             'cod_amount' => 'nullable|numeric|min:0',
+            'cod_method' => 'nullable|string|max:191',
             'notes' => 'nullable|string',
         ]);
 

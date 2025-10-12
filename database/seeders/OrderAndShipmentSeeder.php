@@ -33,7 +33,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'regular',
                 'shipping_cost' => 25.00,
                 'discount' => 0,
-                'cod_payment' => false,
                 'notes' => 'Awaiting confirmation from warehouse.',
                 'items' => [
                     ['sku' => 'ELEC-TV-55-001', 'quantity' => 1],
@@ -58,7 +57,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'express',
                 'shipping_cost' => 32.50,
                 'discount' => 15.00,
-                'cod_payment' => false,
                 'notes' => 'Priority handling required.',
                 'items' => [
                     ['sku' => 'PHN-IP15P-002', 'quantity' => 1],
@@ -90,7 +88,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'regular',
                 'shipping_cost' => 18.00,
                 'discount' => 0,
-                'cod_payment' => false,
                 'notes' => 'Customer notified of shipment.',
                 'items' => [
                     ['sku' => 'HK-AIRF-002', 'quantity' => 1],
@@ -122,7 +119,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'express',
                 'shipping_cost' => 28.00,
                 'discount' => 10.00,
-                'cod_payment' => false,
                 'notes' => 'Delivered and signed by recipient.',
                 'items' => [
                     ['sku' => 'LAP-GAME16-002', 'quantity' => 1],
@@ -153,7 +149,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'regular',
                 'shipping_cost' => 22.00,
                 'discount' => 0,
-                'cod_payment' => false,
                 'notes' => 'Waiting for stock allocation.',
                 'items' => [
                     ['sku' => 'FUR-SOFA3-001', 'quantity' => 1],
@@ -177,7 +172,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'express',
                 'shipping_cost' => 45.00,
                 'discount' => 20.00,
-                'cod_payment' => false,
                 'notes' => 'Seasonal sale order.',
                 'items' => [
                     ['sku' => 'CAMP-TENT2-001', 'quantity' => 1],
@@ -209,7 +203,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'regular',
                 'shipping_cost' => 30.00,
                 'discount' => 5.00,
-                'cod_payment' => false,
                 'notes' => 'Fitness bundle order.',
                 'items' => [
                     ['sku' => 'FIT-RB-002', 'quantity' => 3],
@@ -241,7 +234,6 @@ class OrderAndShipmentSeeder extends Seeder
                 'shipping_method' => 'regular',
                 'shipping_cost' => 25.00,
                 'discount' => 0,
-                'cod_payment' => false,
                 'notes' => 'Annual procurement order.',
                 'items' => [
                     ['sku' => 'HK-PAN28-001', 'quantity' => 2],
@@ -390,7 +382,6 @@ class OrderAndShipmentSeeder extends Seeder
                         'billing_address' => $billingAddress,
                         'shipping_type' => $orderConfig['shipping_type'],
                         'shipping_method' => $orderConfig['shipping_method'],
-                        'cod_payment' => $orderConfig['cod_payment'],
                         'shipping_company' => null,
                         'carrier_id' => null,
                         'carrier_service_type' => null,
@@ -482,6 +473,7 @@ class OrderAndShipmentSeeder extends Seeder
                             'shipping_cost' => $shipmentConfig['shipping_cost'],
                             'cod_payment' => false,
                             'cod_amount' => null,
+                            'cod_method' => null,
                             'notes' => $orderConfig['notes'],
                             'tracking_events' => $trackingEvents,
                             'picked_up_at' => $pickedUpAt,

@@ -32,7 +32,6 @@ class Order extends Model
         'carrier_service_type',
         'shipping_type',
         'shipping_method',
-        'cod_payment',
         'shipped_at',
         'delivered_at',
     ];
@@ -45,7 +44,6 @@ class Order extends Model
         'total' => 'decimal:2',
         'shipping_address' => 'array',
         'billing_address' => 'array',
-        'cod_payment' => 'boolean',
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
         'source_metadata' => 'array',

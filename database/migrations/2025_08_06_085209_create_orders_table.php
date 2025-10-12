@@ -44,7 +44,6 @@ return new class extends Migration
             $table->string('shipping_company')->nullable();
             $table->enum('shipping_type', ['delivery', 'pickup'])->default('delivery');
             $table->enum('shipping_method', ['regular', 'express', 'pickup'])->default('regular');
-            $table->boolean('cod_payment')->default(false); // Cash on Delivery
             $table->timestamp('shipped_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamps();

@@ -14,6 +14,7 @@ use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -128,7 +129,6 @@ class OrderController extends Controller
             'billing_address' => 'required|array',
             'shipping_type' => 'required|in:delivery,pickup',
             'shipping_method' => 'required|in:regular,express,pickup',
-            'cod_payment' => 'boolean',
             'notes' => 'nullable|string',
             'source' => 'nullable|string|max:50',
             'source_reference' => 'nullable|string|max:100',
@@ -170,7 +170,7 @@ class OrderController extends Controller
                 'source_reference' => $request->input('source_reference'),
                 'source_metadata' => $request->input('source_metadata'),
                 'status' => 'pending',
-                'payment_status' => $request->cod_payment ? 'pending' : 'pending',
+                'payment_status' => 'pending',
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'shipping_cost' => $shippingCost,
@@ -181,7 +181,6 @@ class OrderController extends Controller
                 'billing_address' => $request->billing_address,
                 'shipping_type' => $request->shipping_type,
                 'shipping_method' => $request->shipping_method,
-                'cod_payment' => $request->cod_payment ?? false,
             ]);
 
             // Create order items and update stock
@@ -704,7 +703,7 @@ class OrderController extends Controller
      */
     public function getShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {
@@ -713,6 +712,8 @@ class OrderController extends Controller
 
         $merchant = Merchant::where('user_id', $order->merchant_id)->first();
         $payload = $this->shippingSettingsService->buildPayload($merchant);
+
+        $existingShipment = $order->shipment()->latest('created_at')->first();
 
         return $this->successResponse([
             'order' => [
@@ -724,15 +725,19 @@ class OrderController extends Controller
                 'carrier_id' => $order->carrier_id,
                 'carrier_service_type' => $order->carrier_service_type,
                 'weight' => $order->items->sum('weight') ?? 0,
+                'shipping_address' => $order->shipping_address,
+                'billing_address' => $order->billing_address,
                 'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
             ],
             'merchant' => $merchant ? [
                 'id' => $merchant->id,
                 'user_id' => $merchant->user_id,
                 'business_name' => $merchant->business_name,
+                'address' => $merchant->address,
             ] : null,
             'settings' => $payload['settings'],
             'options' => $payload['options'],
+            'shipment' => $existingShipment ? $existingShipment->load(['carrier']) : null,
         ], 'Order shipping settings retrieved successfully');
     }
 
@@ -741,23 +746,27 @@ class OrderController extends Controller
      */
     public function updateShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {
             return $this->errorResponse('Unauthorized', 403);
         }
 
+        $sizeOptions = $this->shippingSettingsService->shippingSizeOptions();
+
         $validated = $request->validate([
             'default_destination' => 'nullable|string|max:100',
             'default_service_type' => 'nullable|string|max:100',
-            'default_package_type' => 'nullable|string|max:100',
+            'default_shipping_size' => ['nullable', Rule::in($sizeOptions)],
+            'default_package_type' => ['nullable', Rule::in($sizeOptions)],
             'shipping_units' => 'nullable|array',
             'shipping_units.*.destination' => 'required|string|max:100',
             'shipping_units.*.service_type' => 'required|string|max:100',
             'shipping_units.*.carrier_id' => 'nullable|exists:shipping_carriers,id',
             'shipping_units.*.carrier_code' => 'nullable|string|max:191|exists:shipping_carriers,code',
-            'shipping_units.*.package_type' => 'nullable|string|max:100',
+            'shipping_units.*.shipping_size' => ['nullable', Rule::in($sizeOptions)],
+            'shipping_units.*.package_type' => ['nullable', Rule::in($sizeOptions)],
             'shipping_units.*.quantity' => 'required|integer|min:1|max:999',
             'shipping_units.*.price' => 'nullable|numeric|min:0',
             'shipping_units.*.notes' => 'nullable|string',
@@ -765,6 +774,15 @@ class OrderController extends Controller
             'carrier_service_type' => 'required_with:carrier_id|string|max:100',
             'shipping_type' => 'nullable|in:delivery,pickup',
             'shipping_method' => 'nullable|string|max:100',
+            'dispatch_shipment' => 'nullable|boolean',
+            'carrier_name' => 'nullable|string|max:191',
+            'origin_address' => 'nullable|array',
+            'destination_address' => 'nullable|array',
+            'shipping_cost' => 'nullable|numeric|min:0',
+            'cod_payment' => 'nullable|boolean',
+            'cod_amount' => 'nullable|numeric|min:0',
+            'cod_method' => 'nullable|string|max:191',
+            'shipment_notes' => 'nullable|string',
         ]);
 
         $merchant = Merchant::where('user_id', $order->merchant_id)->first();
@@ -773,7 +791,21 @@ class OrderController extends Controller
             $merchant->update([
                 'shipping_settings' => $this->shippingSettingsService->prepareForStorage(
                     $validated,
-                    ['carrier_id', 'carrier_service_type', 'shipping_type', 'shipping_method']
+                    [
+                        'carrier_id',
+                        'carrier_service_type',
+                        'shipping_type',
+                        'shipping_method',
+                        'dispatch_shipment',
+                        'origin_address',
+                        'destination_address',
+                        'carrier_name',
+                        'shipping_cost',
+                        'cod_payment',
+                        'cod_amount',
+                        'cod_method',
+                        'shipment_notes',
+                    ]
                 ),
             ]);
         }
@@ -786,6 +818,9 @@ class OrderController extends Controller
         if ($orderUpdates->isNotEmpty()) {
             $order->update($orderUpdates->all());
         }
+
+        $carrier = null;
+        $existingShipment = $order->shipment()->latest('created_at')->first();
 
         if (!empty($validated['carrier_id'])) {
             $carrier = ShippingCarrier::findOrFail($validated['carrier_id']);
@@ -810,6 +845,22 @@ class OrderController extends Controller
             ]);
         }
 
+        $shipment = null;
+
+        if ($request->boolean('dispatch_shipment')) {
+            $order->refresh();
+            $merchant?->refresh();
+            $shipment = $this->dispatchShipmentForOrder(
+                $order,
+                $merchant,
+                $validated,
+                $request,
+                $carrier ?? $order->carrier,
+                $existingShipment
+            );
+            $order = $order->fresh(['items', 'carrier', 'user', 'merchant']);
+        }
+
         $order->refresh();
         $merchant?->refresh();
 
@@ -825,8 +876,11 @@ class OrderController extends Controller
                 'carrier_id' => $order->carrier_id,
                 'carrier_service_type' => $order->carrier_service_type,
                 'weight' => $order->items->sum('weight') ?? 0,
+                'shipping_address' => $order->shipping_address,
+                'billing_address' => $order->billing_address,
                 'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
             ],
+            'shipment' => $shipment ? $shipment->load(['order', 'carrier']) : null,
             'merchant' => $merchant ? [
                 'id' => $merchant->id,
                 'user_id' => $merchant->user_id,
@@ -835,6 +889,156 @@ class OrderController extends Controller
             'settings' => $payload['settings'],
             'options' => $payload['options'],
         ], 'Order shipping settings updated successfully');
+    }
+
+    protected function dispatchShipmentForOrder(
+        Order $order,
+        ?Merchant $merchant,
+        array $validated,
+        Request $request,
+        ?ShippingCarrier $carrier = null,
+        ?Shipment $existingShipment = null
+    ): Shipment {
+        $serviceType = $validated['carrier_service_type'] ?? $order->carrier_service_type ?? $order->shipping_method ?? 'regular';
+        $normalizedServiceType = $this->normalizeShipmentServiceType($serviceType);
+
+        $sizeCandidate = $validated['default_shipping_size']
+            ?? $validated['default_package_type']
+            ?? ($validated['shipping_units'][0]['shipping_size'] ?? null)
+            ?? ($validated['shipping_units'][0]['package_type'] ?? null);
+
+        $packageType = $this->shippingSettingsService->normalizeSize($sizeCandidate);
+
+        $originAddress = $this->resolveOriginAddress(
+            $request->input('origin_address'),
+            $merchant,
+            $order
+        );
+        $destinationAddress = $this->resolveDestinationAddress(
+            $request->input('destination_address'),
+            $order
+        );
+
+        $shippingCost = $validated['shipping_cost'] ?? $order->shipping_cost ?? $existingShipment?->shipping_cost ?? 0;
+        $codPayment = $request->has('cod_payment')
+            ? $request->boolean('cod_payment')
+            : ($existingShipment?->cod_payment ?? false);
+        $codAmount = $codPayment
+            ? ($request->has('cod_amount') ? $validated['cod_amount'] : ($existingShipment?->cod_amount ?? 0))
+            : null;
+        $codMethod = $codPayment
+            ? ($request->input('cod_method') ?? $existingShipment?->cod_method ?? null)
+            : null;
+
+        $carrierName = $request->input('carrier_name')
+            ?? $carrier?->name
+            ?? $order->carrier?->name
+            ?? 'Manual';
+
+        return DB::transaction(function () use (
+            $order,
+            $carrier,
+            $carrierName,
+            $serviceType,
+            $normalizedServiceType,
+            $packageType,
+            $shippingCost,
+            $originAddress,
+            $destinationAddress,
+            $codPayment,
+            $codAmount,
+            $request
+        ) {
+            $shipment = Shipment::firstOrNew(['order_id' => $order->id]);
+
+            if (!$shipment->exists) {
+                $shipment->status = 'pending';
+            }
+
+            $shipment->fill([
+                'carrier_id' => $carrier?->id,
+                'carrier_service_type' => $serviceType,
+                'carrier' => $carrierName,
+                'service_type' => $normalizedServiceType,
+                'package_type' => $packageType,
+                'origin_address' => $originAddress,
+                'destination_address' => $destinationAddress,
+                'shipping_cost' => $shippingCost,
+                'weight' => $request->input('weight') ?? ($order->items->sum('weight') ?? null),
+                'cod_payment' => $codPayment,
+                'cod_amount' => $codPayment ? $codAmount : null,
+                'cod_method' => $codPayment ? $codMethod : null,
+                'notes' => $request->input('shipment_notes'),
+            ]);
+
+            $shipment->save();
+
+            if ($shipment->wasRecentlyCreated) {
+                $shipment->addTrackingEvent('Shipment created', 'Shipment has been created and is pending pickup');
+            }
+
+            $order->update([
+                'status' => 'shipped',
+                'shipping_cost' => $shippingCost,
+                'shipping_company' => $carrierName,
+                'carrier_id' => $carrier?->id ?? $order->carrier_id,
+                'carrier_service_type' => $serviceType,
+                'shipping_method' => $normalizedServiceType,
+                'shipped_at' => now(),
+            ]);
+
+            return $shipment;
+        });
+    }
+
+    protected function normalizeShipmentServiceType(?string $serviceType): string
+    {
+        $value = strtolower((string) $serviceType);
+
+        return match ($value) {
+            'pickup' => 'pickup',
+            'express' => 'express',
+            'regular', 'courier', 'delivery', 'standard' => 'regular',
+            default => 'regular',
+        };
+    }
+
+    protected function resolveOriginAddress(?array $provided, ?Merchant $merchant, Order $order): array
+    {
+        if (is_array($provided) && count($provided)) {
+            return $provided;
+        }
+
+        if ($merchant && is_array($merchant->address) && count($merchant->address)) {
+            return $merchant->address;
+        }
+
+        $billing = is_array($order->billing_address) ? $order->billing_address : [];
+
+        return array_merge([
+            'name' => $merchant?->business_name ?? 'מחסן החברה',
+            'street' => $billing['street'] ?? ($billing['address'] ?? ''),
+            'city' => $billing['city'] ?? '',
+            'zip' => $billing['zip'] ?? ($billing['postal_code'] ?? ''),
+            'phone' => $merchant?->phone ?? ($order->user?->phone ?? null),
+        ], $billing);
+    }
+
+    protected function resolveDestinationAddress(?array $provided, Order $order): array
+    {
+        if (is_array($provided) && count($provided)) {
+            return $provided;
+        }
+
+        $shipping = is_array($order->shipping_address) ? $order->shipping_address : [];
+
+        return array_merge([
+            'name' => $shipping['name'] ?? $order->user?->name ?? 'לקוח',
+            'street' => $shipping['street'] ?? ($shipping['address'] ?? ''),
+            'city' => $shipping['city'] ?? '',
+            'zip' => $shipping['zip'] ?? ($shipping['postal_code'] ?? ''),
+            'phone' => $shipping['phone'] ?? ($order->user?->phone ?? null),
+        ], $shipping);
     }
 
     /**

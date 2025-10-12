@@ -36,6 +36,7 @@ return new class extends Migration
             $table->decimal('shipping_cost', 10, 2);
             $table->boolean('cod_payment')->default(false);
             $table->decimal('cod_amount', 10, 2)->nullable();
+            $table->string('cod_method', 32)->nullable();
             $table->text('notes')->nullable();
             $table->json('tracking_events')->nullable(); // Tracking history
             $table->timestamp('picked_up_at')->nullable();
