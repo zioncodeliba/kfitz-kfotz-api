@@ -7,6 +7,7 @@ use App\Traits\ApiResponse;
 use App\Models\Merchant;
 use App\Models\User;
 use App\Models\Role;
+use App\Models\Product;
 use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -196,12 +197,22 @@ class MerchantController extends Controller
             return $this->errorResponse('Merchant profile not found', 404);
         }
 
+        $currentMonthOutstanding = $merchant->orders()
+            ->whereIn('status', ['pending', 'processing', 'shipped'])
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('total');
+
+        $lowStockCount = Product::lowStock()->count();
+        $availableProductsCount = Product::inStock()->count();
+
         $stats = [
             'monthly_revenue' => $merchant->getMonthlyRevenue(),
             'monthly_orders' => $merchant->getMonthlyOrders(),
             'previous_month_revenue' => $merchant->getPreviousMonthRevenue(),
             'previous_month_orders' => $merchant->getPreviousMonthOrders(),
             'outstanding_balance' => $merchant->getOutstandingBalance(),
+            'current_month_outstanding' => $currentMonthOutstanding,
             'total_orders' => $merchant->orders()->count(),
             'pending_orders' => $merchant->orders()->where('status', 'pending')->count(),
             'processing_orders' => $merchant->orders()->where('status', 'processing')->count(),
@@ -209,6 +220,8 @@ class MerchantController extends Controller
             'delivered_orders' => $merchant->orders()->where('status', 'delivered')->count(),
             'balance' => $merchant->balance,
             'credit_limit' => $merchant->credit_limit,
+            'low_stock_products' => $lowStockCount,
+            'available_products' => $availableProductsCount,
         ];
 
         return $this->successResponse($stats);
@@ -245,23 +258,65 @@ class MerchantController extends Controller
         }
 
         $merchant = $user->merchant;
+
         if (!$merchant) {
-            return $this->errorResponse('Merchant profile not found', 404);
+            $validated = $request->validate([
+                'business_name' => 'required|string|max:255',
+                'business_id' => 'required|string|unique:merchants,business_id',
+                'phone' => 'required|string|max:20',
+                'website' => 'nullable|url',
+                'description' => 'nullable|string',
+                'address' => 'required|array',
+                'address.name' => 'nullable|string|max:255',
+                'address.address' => 'required|string|max:255',
+                'address.city' => 'required|string|max:255',
+                'address.zip' => 'required|string|max:20',
+                'address.phone' => 'required|string|max:20',
+            ]);
+
+            $merchant = Merchant::create([
+                'user_id' => $user->id,
+                'business_name' => $validated['business_name'],
+                'business_id' => $validated['business_id'],
+                'phone' => $validated['phone'],
+                'website' => $validated['website'] ?? null,
+                'description' => $validated['description'] ?? null,
+                'address' => $validated['address'],
+                'status' => 'active',
+                'verification_status' => 'pending',
+                'commission_rate' => 10,
+                'monthly_fee' => 0,
+                'balance' => 0,
+                'credit_limit' => 0,
+            ]);
+
+            return $this->successResponse($merchant->load('user'), 'Profile created successfully');
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'business_name' => 'sometimes|required|string|max:255',
+            'business_id' => [
+                'sometimes',
+                'required',
+                'string',
+                Rule::unique('merchants', 'business_id')->ignore($merchant->id),
+            ],
             'phone' => 'sometimes|required|string|max:20',
             'website' => 'nullable|url',
             'description' => 'nullable|string',
             'address' => 'sometimes|required|array',
+            'address.name' => 'nullable|string|max:255',
+            'address.address' => 'sometimes|required|string|max:255',
+            'address.city' => 'sometimes|required|string|max:255',
+            'address.zip' => 'sometimes|required|string|max:20',
+            'address.phone' => 'sometimes|required|string|max:20',
             'payment_methods' => 'nullable|array',
             'shipping_settings' => 'nullable|array',
             'banner_settings' => 'nullable|array',
             'popup_settings' => 'nullable|array',
         ]);
 
-        $merchant->update($request->all());
+        $merchant->update($validated);
 
         return $this->successResponse($merchant->load('user'), 'Profile updated successfully');
     }
