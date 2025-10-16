@@ -268,11 +268,28 @@ class MerchantController extends Controller
                 'description' => 'nullable|string',
                 'address' => 'required|array',
                 'address.name' => 'nullable|string|max:255',
-                'address.address' => 'required|string|max:255',
+                'address.address' => 'sometimes|required|string|max:255',
+                'address.street' => 'sometimes|required|string|max:255',
                 'address.city' => 'required|string|max:255',
                 'address.zip' => 'required|string|max:20',
                 'address.phone' => 'required|string|max:20',
+                'shipping_address' => 'nullable|array',
+                'shipping_address.address' => 'sometimes|required|string|max:255',
+                'shipping_address.street' => 'sometimes|required|string|max:255',
+                'shipping_address.city' => 'sometimes|required|string|max:255',
+                'shipping_address.zip' => 'sometimes|required|string|max:20',
+                'shipping_address.phone' => 'nullable|string|max:20',
+                'bank_details' => 'nullable|array',
+                'bank_details.bank_name' => 'nullable|string|max:255',
+                'bank_details.branch_number' => 'nullable|string|max:50',
+                'bank_details.account_number' => 'nullable|string|max:50',
+                'bank_details.account_name' => 'nullable|string|max:255',
             ]);
+
+            $billingAddress = $validated['address'];
+            if (!empty($billingAddress['street']) && empty($billingAddress['address'])) {
+                $billingAddress['address'] = $billingAddress['street'];
+            }
 
             $merchant = Merchant::create([
                 'user_id' => $user->id,
@@ -281,7 +298,7 @@ class MerchantController extends Controller
                 'phone' => $validated['phone'],
                 'website' => $validated['website'] ?? null,
                 'description' => $validated['description'] ?? null,
-                'address' => $validated['address'],
+                'address' => $billingAddress,
                 'status' => 'active',
                 'verification_status' => 'pending',
                 'commission_rate' => 10,
@@ -289,6 +306,23 @@ class MerchantController extends Controller
                 'balance' => 0,
                 'credit_limit' => 0,
             ]);
+
+            $shippingSettings = [];
+            if (!empty($validated['bank_details'])) {
+                $shippingSettings['bank_details'] = $validated['bank_details'];
+            }
+
+            if (!empty($validated['shipping_address'])) {
+                $shippingAddress = $validated['shipping_address'];
+                if (!empty($shippingAddress['street']) && empty($shippingAddress['address'])) {
+                    $shippingAddress['address'] = $shippingAddress['street'];
+                }
+                $shippingSettings['default_shipping_address'] = $shippingAddress;
+            }
+
+            if (!empty($shippingSettings)) {
+                $merchant->update(['shipping_settings' => $shippingSettings]);
+            }
 
             return $this->successResponse($merchant->load('user'), 'Profile created successfully');
         }
