@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -128,6 +129,60 @@ class ProductController extends Controller
         $product->update($request->all());
 
         return $this->successResponse($product->load('category'), 'Product updated successfully');
+    }
+
+    /**
+     * Upload a product image and store it on disk.
+     */
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|file|image|max:5120',
+        ]);
+
+        $file = $request->file('image');
+        $filename = uniqid('product_', true) . '.' . $file->getClientOriginalExtension();
+        $relativePath = 'images/' . $filename;
+
+        Storage::disk('local')->putFileAs('images', $file, $filename);
+
+        $url = url('/api/product-images/' . $relativePath);
+
+        return $this->createdResponse([
+            'path' => $relativePath,
+            'url' => $url,
+            'original_name' => $file->getClientOriginalName(),
+            'size' => $file->getSize(),
+        ], 'Image uploaded successfully');
+    }
+
+    /**
+     * Serve a stored product image.
+     */
+    public function serveImage(string $path)
+    {
+        $decodedPath = urldecode($path);
+        $normalized = ltrim($decodedPath, '/');
+
+        if (str_contains($normalized, '..')) {
+            abort(404);
+        }
+
+        if (!Str::startsWith($normalized, 'images/')) {
+            $normalized = 'images/' . $normalized;
+        }
+
+        if (!Storage::disk('local')->exists($normalized)) {
+            abort(404);
+        }
+
+        $absolutePath = Storage::disk('local')->path($normalized);
+        $mimeType = mime_content_type($absolutePath) ?: 'application/octet-stream';
+
+        return response()->file($absolutePath, [
+            'Content-Type' => $mimeType,
+            'Cache-Control' => 'max-age=604800, public',
+        ]);
     }
 
     /**

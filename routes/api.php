@@ -38,7 +38,7 @@ Route::get('/verify-email', [EmailVerificationController::class, 'verifyFromFron
     ->name('verification.verify.frontend');
 
 // Protected routes
-Route::middleware(['auth:sanctum'])->group(function () {
+Route::middleware(['auth:sanctum', 'check.user.role:merchant'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me', [AuthController::class, 'me']);
     
@@ -83,6 +83,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
         ->whereNumber('id');
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])
         ->whereNumber('id');
+    Route::post('/product-images', [ProductController::class, 'uploadImage']);
     
     // Shipping carrier management (admin only)
     Route::get('/shipping-carriers', [ShippingCarrierController::class, 'index']);
@@ -151,3 +152,6 @@ Route::post('/shipping-carriers/{id}/calculate-cost', [ShippingCarrierController
 
 // Public order shipping calculation
 Route::post('/orders/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);
+
+Route::get('/product-images/{path}', [ProductController::class, 'serveImage'])
+    ->where('path', '.*');

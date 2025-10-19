@@ -243,7 +243,7 @@ class MerchantController extends Controller
             return $this->errorResponse('Merchant profile not found', 404);
         }
 
-        return $this->successResponse($merchant->load('user'));
+        return $this->successResponse($this->formatMerchantProfile($user, $merchant));
     }
 
     /**
@@ -291,11 +291,16 @@ class MerchantController extends Controller
                 $billingAddress['address'] = $billingAddress['street'];
             }
 
+            $contactName = $request->input('contact_name', $request->input('contact_person', $user->name));
+            $emailForOrders = $request->input('email_for_orders', $request->input('email', $user->email));
+
             $merchant = Merchant::create([
                 'user_id' => $user->id,
                 'business_name' => $validated['business_name'],
+                'contact_name' => $contactName,
                 'business_id' => $validated['business_id'],
                 'phone' => $validated['phone'],
+                'email_for_orders' => $emailForOrders,
                 'website' => $validated['website'] ?? null,
                 'description' => $validated['description'] ?? null,
                 'address' => $billingAddress,
@@ -324,7 +329,10 @@ class MerchantController extends Controller
                 $merchant->update(['shipping_settings' => $shippingSettings]);
             }
 
-            return $this->successResponse($merchant->load('user'), 'Profile created successfully');
+            return $this->successResponse(
+                $this->formatMerchantProfile($user, $merchant->refresh()),
+                'Profile created successfully'
+            );
         }
 
         $validated = $request->validate([
@@ -350,9 +358,126 @@ class MerchantController extends Controller
             'popup_settings' => 'nullable|array',
         ]);
 
+        $contactName = $request->input('contact_name', $request->input('contact_person'));
+        if ($contactName !== null) {
+            $validated['contact_name'] = $contactName ?: $user->name;
+        }
+
+        $emailForOrders = $request->input('email_for_orders', $request->input('email'));
+        if ($emailForOrders !== null) {
+            $validated['email_for_orders'] = $emailForOrders ?: $user->email;
+        }
+
         $merchant->update($validated);
 
-        return $this->successResponse($merchant->load('user'), 'Profile updated successfully');
+        return $this->successResponse(
+            $this->formatMerchantProfile($user, $merchant->refresh()),
+            'Profile updated successfully'
+        );
+    }
+
+    protected function formatMerchantProfile(User $user, Merchant $merchant): array
+    {
+        $merchant->loadMissing('user');
+
+        $billingAddress = is_array($merchant->address) ? $merchant->address : null;
+        $shippingSettings = is_array($merchant->shipping_settings) ? $merchant->shipping_settings : null;
+        $shippingAddress = null;
+        $bankDetails = null;
+
+        if ($shippingSettings) {
+            $candidate = data_get($shippingSettings, 'default_shipping_address');
+            $shippingAddress = is_array($candidate) ? $candidate : null;
+            $bankCandidate = data_get($shippingSettings, 'bank_details');
+            $bankDetails = is_array($bankCandidate) ? $bankCandidate : null;
+        }
+
+        $normalizeAddress = static function (?array $address): array {
+            if (!is_array($address)) {
+                return [
+                    'street' => null,
+                    'city' => null,
+                    'zip' => null,
+                    'phone' => null,
+                ];
+            }
+
+            $street = $address['street'] ?? $address['address'] ?? null;
+            $zip = $address['zip'] ?? $address['postal_code'] ?? null;
+            $phone = $address['phone'] ?? $address['contact_phone'] ?? null;
+
+            return [
+                'street' => is_string($street) ? trim($street) : null,
+                'city' => isset($address['city']) && is_string($address['city']) ? trim($address['city']) : null,
+                'zip' => is_string($zip) ? trim($zip) : null,
+                'phone' => is_string($phone) ? trim($phone) : null,
+            ];
+        };
+
+        $normalizeBankDetails = static function (?array $details): array {
+            if (!is_array($details)) {
+                return [
+                    'bank_name' => null,
+                    'branch_number' => null,
+                    'account_number' => null,
+                    'account_name' => null,
+                ];
+            }
+
+            $bankName = $details['bank_name'] ?? $details['name'] ?? null;
+            $branchNumber = $details['branch_number'] ?? $details['branch'] ?? null;
+            $accountNumber = $details['account_number'] ?? $details['number'] ?? null;
+            $accountName = $details['account_name'] ?? $details['owner'] ?? null;
+
+            return [
+                'bank_name' => is_string($bankName) ? trim($bankName) : null,
+                'branch_number' => is_string($branchNumber) ? trim($branchNumber) : null,
+                'account_number' => is_string($accountNumber) ? trim($accountNumber) : null,
+                'account_name' => is_string($accountName) ? trim($accountName) : null,
+            ];
+        };
+
+        $normalizedBilling = $normalizeAddress($billingAddress);
+        $normalizedShipping = $normalizeAddress($shippingAddress);
+        $normalizedBank = $normalizeBankDetails($bankDetails);
+
+        $shippingSame = data_get($shippingSettings, 'use_billing_for_shipping');
+        $platform = $shippingSettings ? data_get($shippingSettings, 'platform') : null;
+        $platform = is_string($platform) ? trim($platform) : null;
+
+        if ($shippingSame === null) {
+            $shippingSame = empty(array_filter($normalizedShipping)) ||
+                $normalizedBilling === $normalizedShipping;
+        } else {
+            $shippingSame = (bool) $shippingSame;
+        }
+
+        $hasBillingData = !empty(array_filter($normalizedBilling));
+        $hasShippingData = !empty(array_filter($normalizedShipping));
+        $hasBankData = !empty(array_filter($normalizedBank));
+
+        return [
+            'user' => $user->only(['id', 'name', 'email', 'phone']),
+            'profile' => array_merge(
+                $merchant->only(['business_name', 'phone', 'business_id']),
+                [
+                    'contact_name' => $merchant->contact_name ?? $user->name,
+                    'contact_person' => $merchant->contact_name ?? $user->name,
+                    'email_for_orders' => $merchant->email_for_orders ?? $user->email,
+                    'email' => $merchant->email_for_orders ?? $user->email,
+                    'tax_id' => $merchant->business_id,
+                    'address' => $billingAddress,
+                    'shipping_address_original' => $shippingAddress,
+                    'billing_address' => $hasBillingData ? $normalizedBilling : null,
+                    'shipping_address' => $hasShippingData ? $normalizedShipping : null,
+                    'shipping_same_as_billing' => $shippingSame,
+                    'bank_details' => $hasBankData ? $normalizedBank : null,
+                    'platform' => $platform,
+                    'website' => $merchant->website ? trim($merchant->website) : null,
+                    'description' => $merchant->description ? trim($merchant->description) : null,
+                ]
+            ),
+        ];
     }
 
     /**
