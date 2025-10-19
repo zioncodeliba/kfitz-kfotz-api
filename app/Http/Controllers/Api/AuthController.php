@@ -8,7 +8,6 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
-use App\Models\Role;
 use App\Notifications\VerifyEmailNotification;
 
 class AuthController extends Controller
@@ -27,13 +26,8 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => 'merchant',
         ]);
-
-        // הקצאת תפקיד ברירת מחדל (user)
-        $defaultRole = Role::where('name', 'user')->first();
-        if ($defaultRole) {
-            $user->roles()->attach($defaultRole->id);
-        }
 
         // Send email verification notification
         $user->sendEmailVerificationNotification();
@@ -42,7 +36,7 @@ class AuthController extends Controller
 
         return $this->createdResponse([
             'token' => $token,
-            'user' => new UserResource($user->load('roles')),
+            'user' => new UserResource($user),
         ], 'User registered successfully. Please check your email to verify your account.');
     }
 
@@ -63,7 +57,7 @@ class AuthController extends Controller
 
         return $this->successResponse([
             'token' => $token,
-            'user' => new UserResource($user->load('roles')),
+            'user' => new UserResource($user),
         ], 'Login successful');
     }
 
@@ -76,8 +70,8 @@ class AuthController extends Controller
 
     public function me(Request $request)
     {
-        $user = $request->user()->load('roles');
-        
+        $user = $request->user();
+
         return $this->successResponse(new UserResource($user));
     }
 
@@ -116,4 +110,3 @@ class AuthController extends Controller
         return $this->errorResponse('Invalid token or email', 400);
     }
 }
-

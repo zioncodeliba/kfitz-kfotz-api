@@ -3,63 +3,51 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
-use App\Models\Role;
 
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        $roleIdByName = Role::pluck('id', 'name');
-
-        // Demo users
         $users = [
             [
                 'name'  => 'Admin User',
                 'email' => 'admin@example.com',
                 'password' => '12345678',
                 'phone' => '+972500000001',
-                'roles' => ['admin'],
+                'role' => 'admin',
             ],
             [
-                'name'  => 'Primary Seller',
-                'email' => 'seller@example.com',
+                'name'  => 'Primary Merchant',
+                'email' => 'merchant@example.com',
                 'password' => '12345678',
                 'phone' => '+972500000002',
-                'roles' => ['merchant'],
+                'role' => 'merchant',
             ],
             [
-                'name'  => 'Catalog Viewer',
-                'email' => 'viewer@example.com',
+                'name'  => 'Support Agent',
+                'email' => 'agent@example.com',
                 'password' => '12345678',
                 'phone' => '+972500000003',
-                'roles' => ['viewer'],
+                'role' => 'agent',
             ],
             [
-                'name'  => 'Regular User One',
-                'email' => 'user1@example.com',
+                'name'  => 'Merchant Without Website',
+                'email' => 'merchant2@example.com',
                 'password' => '12345678',
                 'phone' => '+972500000004',
-                'roles' => ['user'],
-            ],
-            [
-                'name'  => 'Ops Manager',
-                'email' => 'ops@example.com',
-                'password' => '12345678',
-                'phone' => '+972500000005',
-                'roles' => ['merchant','viewer'], // multi-role example
+                'role' => 'merchant',
             ],
         ];
 
         foreach ($users as $u) {
-            // Create or fetch user
             $user = User::firstOrCreate(
                 ['email' => $u['email']],
                 [
                     'name'     => $u['name'],
-                    'password' => Hash::make($u['password']),
+                    'password' => bcrypt($u['password']),
                     'phone'    => $u['phone'] ?? null,
+                    'role'     => $u['role'],
                 ]
             );
 
@@ -67,15 +55,9 @@ class UserSeeder extends Seeder
                 $user->update(['phone' => $u['phone']]);
             }
 
-            // Resolve role IDs
-            $roleIds = collect($u['roles'])
-                ->map(fn ($name) => $roleIdByName[$name] ?? null)
-                ->filter()
-                ->values()
-                ->all();
-
-            // Sync roles exactly to the defined set (no 'role' column usage)
-            $user->roles()->sync($roleIds);
+            if ($user->role !== $u['role']) {
+                $user->update(['role' => $u['role']]);
+            }
         }
     }
 }

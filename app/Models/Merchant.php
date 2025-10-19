@@ -10,6 +10,7 @@ class Merchant extends Model
 {
     protected $fillable = [
         'user_id',
+        'agent_id',
         'business_name',
         'contact_name',
         'business_id',
@@ -52,9 +53,19 @@ class Merchant extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function agent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'agent_id');
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'merchant_id', 'user_id');
+    }
+
+    public function pluginSites(): HasMany
+    {
+        return $this->hasMany(MerchantSite::class);
     }
 
     // Status methods

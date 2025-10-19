@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ShippingCarrier;
 use App\Models\Shipment;
 use App\Models\Merchant;
+use App\Models\User;
 use App\Services\ShippingSettingsService;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
@@ -20,9 +21,61 @@ class OrderController extends Controller
 {
     use ApiResponse;
 
+    protected array $agentMerchantCache = [];
+
     public function __construct(
         protected ShippingSettingsService $shippingSettingsService
     ) {
+    }
+
+    protected function getAgentManagedMerchantUserIds($user): array
+    {
+        if (!isset($this->agentMerchantCache[$user->id])) {
+            $this->agentMerchantCache[$user->id] = $user->agentMerchants()
+                ->pluck('user_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $this->agentMerchantCache[$user->id];
+    }
+
+    protected function applyOrderVisibilityScope($query, $user, ?array $agentMerchantIds = null)
+    {
+        if ($user->hasRole('admin')) {
+            return $query;
+        }
+
+        if ($user->hasRole('merchant')) {
+            return $query->where('merchant_id', $user->id);
+        }
+
+        if ($user->hasRole('agent')) {
+            $managedMerchantIds = $agentMerchantIds ?? $this->getAgentManagedMerchantUserIds($user);
+
+            return $query->where(function ($agentQuery) use ($user, $managedMerchantIds) {
+                $agentQuery->where('agent_id', $user->id);
+
+                if (!empty($managedMerchantIds)) {
+                    $agentQuery->orWhereIn('merchant_id', $managedMerchantIds);
+                }
+            });
+        }
+
+        return $query->where('user_id', $user->id);
+    }
+
+    protected function agentCanAccessOrder($user, Order $order): bool
+    {
+        if ($order->agent_id === $user->id) {
+            return true;
+        }
+
+        $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+
+        return !empty($managedMerchantIds) && in_array($order->merchant_id, $managedMerchantIds, true);
     }
 
     /**
@@ -33,19 +86,8 @@ class OrderController extends Controller
         $user = $request->user();
         $query = Order::with(['items.product', 'user', 'merchant', 'agent']);
 
-        // Filter by user role
-        if ($user->hasRole('admin')) {
-            // Admin can see all orders
-        } elseif ($user->hasRole('merchant')) {
-            // Merchant can see their own orders
-            $query->where('merchant_id', $user->id);
-        } elseif ($user->hasRole('agent')) {
-            // Agent can see orders they created
-            $query->where('agent_id', $user->id);
-        } else {
-            // Customer can see their own orders
-            $query->where('user_id', $user->id);
-        }
+        $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
+        $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
 
         // Filter by status
         if ($request->has('status')) {
@@ -85,15 +127,8 @@ class OrderController extends Controller
         $query = Order::with(['items.product', 'user', 'merchant', 'agent'])
             ->whereIn('status', ['pending', 'confirmed', 'processing']);
 
-        if ($user->hasRole('admin')) {
-            // Admin can see all open orders
-        } elseif ($user->hasRole('merchant')) {
-            $query->where('merchant_id', $user->id);
-        } elseif ($user->hasRole('agent')) {
-            $query->where('agent_id', $user->id);
-        } else {
-            $query->where('user_id', $user->id);
-        }
+        $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
+        $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
 
         if ($request->has('payment_status')) {
             $query->where('payment_status', $request->payment_status);
@@ -121,7 +156,7 @@ class OrderController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
@@ -134,14 +169,42 @@ class OrderController extends Controller
             'source_reference' => 'nullable|string|max:100',
             'source_metadata' => 'nullable|array',
             'shipping_cost' => 'nullable|numeric|min:0',
+            'merchant_id' => 'nullable|exists:users,id',
         ]);
 
         try {
             DB::beginTransaction();
 
             $user = $request->user();
-            $merchantId = $user->hasRole('merchant') ? (int) $user->id : null;
-            $items = $request->items;
+            $merchantId = null;
+
+            if ($user->hasRole('merchant')) {
+                $merchantId = (int) $user->id;
+            } elseif ($user->hasRole('agent')) {
+                if (empty($data['merchant_id'])) {
+                    return $this->errorResponse('Agent must specify a merchant for the order', 422);
+                }
+
+                $allowedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+                if (!empty($allowedMerchantIds) && !in_array((int) $data['merchant_id'], $allowedMerchantIds, true)) {
+                    return $this->errorResponse('Selected merchant is not assigned to this agent', 403);
+                }
+
+                $merchantId = (int) $data['merchant_id'];
+            } elseif ($user->hasRole('admin')) {
+                $merchantId = isset($data['merchant_id']) ? (int) $data['merchant_id'] : null;
+            } else {
+                $merchantId = isset($data['merchant_id']) ? (int) $data['merchant_id'] : null;
+            }
+
+            if ($merchantId) {
+                $merchantUser = User::where('id', $merchantId)->where('role', 'merchant')->first();
+                if (!$merchantUser) {
+                    return $this->errorResponse('Selected merchant is invalid', 422);
+                }
+            }
+
+            $items = $data['items'];
             $subtotal = 0;
 
             // Calculate subtotal and validate stock
@@ -160,24 +223,61 @@ class OrderController extends Controller
 
             // Calculate totals
             $tax = $subtotal * 0.17; // 17% VAT
-            if ($request->shipping_type === 'pickup') {
+            if ($data['shipping_type'] === 'pickup') {
                 $shippingCost = 0;
-            } elseif ($request->filled('shipping_cost')) {
-                $shippingCost = max(0, (float) $request->input('shipping_cost'));
+            } elseif (array_key_exists('shipping_cost', $data) && $data['shipping_cost'] !== null) {
+                $shippingCost = max(0, (float) $data['shipping_cost']);
             } else {
                 $shippingCost = 30; // Basic default shipping cost
             }
             $discount = 0; // Can be calculated based on discounts
             $total = $subtotal + $tax + $shippingCost - $discount;
 
+            $source = $data['source'] ?? null;
+            $sourceMetadata = $data['source_metadata'] ?? [];
+
+            if (!is_array($sourceMetadata)) {
+                $sourceMetadata = [];
+            }
+
+            $source = $source && $source !== 'manual' ? strtolower($source) : null;
+
+            if ($user->hasRole('merchant')) {
+                $source = 'merchant_portal';
+                $merchantModel = $user->merchant()->with('pluginSites')->first();
+                if ($merchantModel) {
+                    $site = $merchantModel->pluginSites->first();
+                    $sourceMetadata['merchant_id'] = $merchantModel->id;
+                    $sourceMetadata['merchant_name'] = $merchantModel->business_name;
+                    if ($site) {
+                        $sourceMetadata['site_url'] = $site->site_url;
+                        if ($site->platform) {
+                            $sourceMetadata['platform'] = $site->platform;
+                        }
+                    }
+                }
+            } elseif ($user->hasRole('agent')) {
+                $source = 'agent-portal';
+            } elseif (!$source) {
+                $source = 'system';
+            }
+
+            $sourceMetadata = array_merge([
+                'initiator' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'role' => $user->role,
+                ],
+            ], $sourceMetadata);
+
             // Create order
             $order = Order::create([
                 'user_id' => $user->id,
                 'merchant_id' => $merchantId,
                 'agent_id' => $user->hasRole('agent') ? $user->id : null,
-                'source' => $request->input('source', 'manual'),
-                'source_reference' => $request->input('source_reference'),
-                'source_metadata' => $request->input('source_metadata'),
+                'source' => $source,
+                'source_reference' => $data['source_reference'] ?? null,
+                'source_metadata' => $sourceMetadata,
                 'status' => 'pending',
                 'payment_status' => 'pending',
                 'subtotal' => $subtotal,
@@ -185,11 +285,11 @@ class OrderController extends Controller
                 'shipping_cost' => $shippingCost,
                 'discount' => $discount,
                 'total' => $total,
-                'notes' => $request->notes,
-                'shipping_address' => $request->shipping_address,
-                'billing_address' => $request->billing_address,
-                'shipping_type' => $request->shipping_type,
-                'shipping_method' => $request->shipping_method,
+                'notes' => $data['notes'] ?? null,
+                'shipping_address' => $data['shipping_address'],
+                'billing_address' => $data['billing_address'],
+                'shipping_type' => $data['shipping_type'],
+                'shipping_method' => $data['shipping_method'],
             ]);
 
             // Create order items and update stock
@@ -276,11 +376,20 @@ class OrderController extends Controller
         $order = Order::with(['items.product', 'user', 'merchant', 'agent'])->findOrFail($id);
 
         // Check permissions
-        if (!$user->hasRole('admin') && 
-            $order->user_id !== $user->id && 
-            $order->merchant_id !== $user->id && 
-            $order->agent_id !== $user->id) {
-            return $this->errorResponse('Unauthorized', 403);
+        if ($user->hasRole('admin')) {
+            // allowed
+        } elseif ($user->hasRole('merchant')) {
+            if ($order->merchant_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } elseif ($user->hasRole('agent')) {
+            if (!$this->agentCanAccessOrder($user, $order)) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } else {
+            if ($order->user_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
         }
 
         return $this->successResponse($order);
@@ -295,9 +404,17 @@ class OrderController extends Controller
         $user = $request->user();
 
         // Check permissions
-        if (!$user->hasRole('admin') && 
-            $order->merchant_id !== $user->id && 
-            $order->agent_id !== $user->id) {
+        if ($user->hasRole('admin')) {
+            // allowed
+        } elseif ($user->hasRole('merchant')) {
+            if ($order->merchant_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } elseif ($user->hasRole('agent')) {
+            if (!$this->agentCanAccessOrder($user, $order)) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } else {
             return $this->errorResponse('Unauthorized', 403);
         }
 
@@ -367,15 +484,8 @@ class OrderController extends Controller
         $query = Order::with(['items.product', 'user']);
 
         // Apply role-based filtering
-        if ($user->hasRole('admin')) {
-            // Admin can see all orders
-        } elseif ($user->hasRole('merchant')) {
-            $query->where('merchant_id', $user->id);
-        } elseif ($user->hasRole('agent')) {
-            $query->where('agent_id', $user->id);
-        } else {
-            $query->where('user_id', $user->id);
-        }
+        $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
+        $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
 
         $orders = $query->where('status', $status)
             ->orderBy('created_at', 'desc')
@@ -392,16 +502,8 @@ class OrderController extends Controller
         $user = $request->user();
         $query = Order::query();
 
-        // Apply role-based filtering
-        if ($user->hasRole('admin')) {
-            // Admin can see all orders
-        } elseif ($user->hasRole('merchant')) {
-            $query->where('merchant_id', $user->id);
-        } elseif ($user->hasRole('agent')) {
-            $query->where('agent_id', $user->id);
-        } else {
-            $query->where('user_id', $user->id);
-        }
+        $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
+        $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
 
         [$currentStart, $currentEnd] = $this->resolveRangeDates('last_week', Carbon::today());
         $daysInWindow = $currentStart->diffInDays($currentEnd) + 1;
@@ -722,8 +824,15 @@ class OrderController extends Controller
                 $orderQuery->where('merchant_id', $user->id);
             });
         } elseif ($user->hasRole('agent')) {
-            $query->whereHas('order', function ($orderQuery) use ($user) {
-                $orderQuery->where('agent_id', $user->id);
+            $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+            $query->whereHas('order', function ($orderQuery) use ($user, $managedMerchantIds) {
+                $orderQuery->where(function ($inner) use ($user, $managedMerchantIds) {
+                    $inner->where('agent_id', $user->id);
+
+                    if (!empty($managedMerchantIds)) {
+                        $inner->orWhereIn('merchant_id', $managedMerchantIds);
+                    }
+                });
             });
         } else {
             $query->whereHas('order', function ($orderQuery) use ($user) {
@@ -767,8 +876,15 @@ class OrderController extends Controller
                 $orderQuery->where('merchant_id', $user->id);
             });
         } elseif ($user->hasRole('agent')) {
-            $query->whereHas('order', function ($orderQuery) use ($user) {
-                $orderQuery->where('agent_id', $user->id);
+            $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+            $query->whereHas('order', function ($orderQuery) use ($user, $managedMerchantIds) {
+                $orderQuery->where(function ($inner) use ($user, $managedMerchantIds) {
+                    $inner->where('agent_id', $user->id);
+
+                    if (!empty($managedMerchantIds)) {
+                        $inner->orWhereIn('merchant_id', $managedMerchantIds);
+                    }
+                });
             });
         } else {
             $query->whereHas('order', function ($orderQuery) use ($user) {

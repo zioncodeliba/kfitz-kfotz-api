@@ -17,7 +17,7 @@ class CheckUserRole
         }
 
         // בדיקה אם למשתמש יש לפחות אחד מהתפקידים הנדרשים
-        $hasRole = $user->roles()->whereIn('name', $roles)->exists();
+        $hasRole = in_array($user->role, $roles, true);
 
         if (!$hasRole) {
             return response()->json(['message' => 'Insufficient permissions'], 403);

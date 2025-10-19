@@ -61,15 +61,6 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::put('/users/{id}', [UserController::class, 'update']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
-    Route::post('/users/{userId}/assign-role', [UserController::class, 'assignRole']);
-    Route::post('/users/{userId}/remove-role', [UserController::class, 'removeRole']);
-    
-    // Role management
-    Route::get('/roles', [\App\Http\Controllers\Api\RoleController::class, 'index']);
-    Route::post('/roles', [\App\Http\Controllers\Api\RoleController::class, 'store']);
-    Route::get('/roles/{id}', [\App\Http\Controllers\Api\RoleController::class, 'show']);
-    Route::put('/roles/{id}', [\App\Http\Controllers\Api\RoleController::class, 'update']);
-    Route::delete('/roles/{id}', [\App\Http\Controllers\Api\RoleController::class, 'destroy']);
     
     // Category management (admin only)
     Route::post('/categories', [CategoryController::class, 'store']);

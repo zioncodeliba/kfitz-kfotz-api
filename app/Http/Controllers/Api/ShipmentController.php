@@ -12,6 +12,22 @@ class ShipmentController extends Controller
 {
     use ApiResponse;
 
+    protected array $agentMerchantCache = [];
+
+    protected function getAgentManagedMerchantUserIds($user): array
+    {
+        if (!isset($this->agentMerchantCache[$user->id])) {
+            $this->agentMerchantCache[$user->id] = $user->agentMerchants()
+                ->pluck('user_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        return $this->agentMerchantCache[$user->id];
+    }
+
     /**
      * Display a listing of the resource.
      */
@@ -29,9 +45,16 @@ class ShipmentController extends Controller
                 $q->where('merchant_id', $user->id);
             });
         } elseif ($user->hasRole('agent')) {
-            // Agent can see shipments for orders they created
-            $query->whereHas('order', function($q) use ($user) {
-                $q->where('agent_id', $user->id);
+            // Agent can see shipments for orders assigned to them or their merchants
+            $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+            $query->whereHas('order', function($q) use ($user, $managedMerchantIds) {
+                $q->where(function ($inner) use ($user, $managedMerchantIds) {
+                    $inner->where('agent_id', $user->id);
+
+                    if (!empty($managedMerchantIds)) {
+                        $inner->orWhereIn('merchant_id', $managedMerchantIds);
+                    }
+                });
             });
         } else {
             // Customer can see their own shipments
@@ -123,8 +146,14 @@ class ShipmentController extends Controller
         if (!$user->hasRole('admin')) {
             if ($user->hasRole('merchant') && $shipment->order->merchant_id !== $user->id) {
                 return $this->errorResponse('Unauthorized', 403);
-            } elseif ($user->hasRole('agent') && $shipment->order->agent_id !== $user->id) {
-                return $this->errorResponse('Unauthorized', 403);
+            } elseif ($user->hasRole('agent')) {
+                $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+                if (
+                    $shipment->order->agent_id !== $user->id &&
+                    (empty($managedMerchantIds) || !in_array($shipment->order->merchant_id, $managedMerchantIds, true))
+                ) {
+                    return $this->errorResponse('Unauthorized', 403);
+                }
             } elseif ($shipment->order->user_id !== $user->id) {
                 return $this->errorResponse('Unauthorized', 403);
             }

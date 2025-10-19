@@ -19,6 +19,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'phone',
         'password',
+        'role',
     ];
 
     protected $hidden = [
@@ -34,14 +35,9 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
-    public function roles()
+    public function hasRole(string $roleName): bool
     {
-        return $this->belongsToMany(Role::class);
-    }
-
-    public function hasRole($roleName)
-    {
-        return $this->roles()->where('name', $roleName)->exists();
+        return $this->role === $roleName;
     }
 
     public function merchant()
@@ -57,6 +53,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function agentMerchants(): HasMany
+    {
+        return $this->hasMany(Merchant::class, 'agent_id');
     }
 
     /**

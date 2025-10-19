@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Traits\ApiResponse;
 use App\Models\Merchant;
 use App\Models\User;
-use App\Models\Role;
 use App\Models\Product;
 use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
@@ -27,11 +26,24 @@ class MerchantController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Merchant::with(['user']);
+        $query = Merchant::with(['user', 'agent', 'pluginSites']);
 
-        // Only admin can see all merchants
-        if (!$user->hasRole('admin')) {
+        if ($user->hasRole('admin')) {
+            // Admin can see all merchants
+        } elseif ($user->hasRole('agent')) {
+            $query->where('agent_id', $user->id);
+        } elseif ($user->hasRole('merchant')) {
+            $query->where('user_id', $user->id);
+        } else {
             return $this->errorResponse('Unauthorized', 403);
+        }
+
+        if ($user->hasRole('admin') && $request->filled('agent_id')) {
+            $query->where('agent_id', $request->input('agent_id'));
+        }
+
+        if ($user->hasRole('admin') && $request->boolean('unassigned', false)) {
+            $query->whereNull('agent_id');
         }
 
         // Filter by status
@@ -71,12 +83,13 @@ class MerchantController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
-        $request->validate([
+        $data = $request->validate([
             'user_id' => 'required|exists:users,id|unique:merchants,user_id',
+            'agent_id' => 'nullable|exists:users,id',
             'business_name' => 'required|string|max:255',
             'business_id' => 'required|string|unique:merchants,business_id',
             'phone' => 'required|string|max:20',
-            'website' => 'nullable|url',
+            'website' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'address' => 'required|array',
             'address.name' => 'required|string',
@@ -87,16 +100,52 @@ class MerchantController extends Controller
             'commission_rate' => 'numeric|min:0|max:100',
             'monthly_fee' => 'numeric|min:0',
             'credit_limit' => 'numeric|min:0',
+            'plugin_sites' => 'nullable|array',
+            'plugin_sites.*.site_url' => 'required|string|max:255',
+            'plugin_sites.*.platform' => 'nullable|string|max:100',
+            'plugin_sites.*.plugin_installed_at' => 'nullable|date',
         ]);
 
-        // Assign merchant role to user
-        $user = User::findOrFail($request->user_id);
-        $merchantRole = Role::where('name', 'merchant')->first();
-        $user->roles()->attach($merchantRole->id);
+        $merchantUser = User::findOrFail($data['user_id']);
+        if ($merchantUser->role === 'admin') {
+            return $this->errorResponse('Cannot convert an admin user into a merchant', 422);
+        }
 
-        $merchant = Merchant::create($request->all());
+        if (!$merchantUser->hasRole('merchant')) {
+            $merchantUser->update(['role' => 'merchant']);
+        }
 
-        return $this->createdResponse($merchant->load('user'), 'Merchant created successfully');
+        $agentId = $data['agent_id'] ?? null;
+        if ($agentId) {
+            $agent = User::where('id', $agentId)->where('role', 'agent')->first();
+            if (!$agent) {
+                return $this->errorResponse('Assigned agent must be a valid agent user', 422);
+            }
+        }
+
+        $pluginSites = collect($data['plugin_sites'] ?? [])
+            ->map(function (array $site) {
+                return [
+                    'site_url' => trim($site['site_url']),
+                    'platform' => isset($site['platform']) ? trim((string) $site['platform']) : null,
+                    'plugin_installed_at' => $site['plugin_installed_at'] ?? null,
+                ];
+            })
+            ->filter(fn ($site) => !empty($site['site_url']))
+            ->values();
+
+        unset($data['plugin_sites']);
+
+        $merchant = Merchant::create($data);
+
+        if ($pluginSites->isNotEmpty()) {
+            $merchant->pluginSites()->createMany($pluginSites->all());
+        }
+
+        return $this->createdResponse(
+            $merchant->load(['user', 'agent', 'pluginSites']),
+            'Merchant created successfully'
+        );
     }
 
     /**
@@ -105,10 +154,16 @@ class MerchantController extends Controller
     public function show(Request $request, string $id)
     {
         $user = $request->user();
-        $merchant = Merchant::with(['user', 'orders'])->findOrFail($id);
+        $merchant = Merchant::with(['user', 'agent', 'pluginSites', 'orders'])->findOrFail($id);
 
         // Check permissions
-        if (!$user->hasRole('admin') && $merchant->user_id !== $user->id) {
+        if ($user->hasRole('admin')) {
+            // allowed
+        } elseif ($user->hasRole('agent')) {
+            if ($merchant->agent_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } elseif ($merchant->user_id !== $user->id) {
             return $this->errorResponse('Unauthorized', 403);
         }
 
@@ -135,11 +190,11 @@ class MerchantController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
-        $request->validate([
+        $data = $request->validate([
             'business_name' => 'sometimes|required|string|max:255',
             'business_id' => 'sometimes|required|string|unique:merchants,business_id,' . $id,
             'phone' => 'sometimes|required|string|max:20',
-            'website' => 'nullable|url',
+            'website' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'address' => 'sometimes|required|array',
             'status' => 'sometimes|in:active,suspended,pending',
@@ -151,16 +206,61 @@ class MerchantController extends Controller
             'shipping_settings' => 'nullable|array',
             'banner_settings' => 'nullable|array',
             'popup_settings' => 'nullable|array',
+            'agent_id' => 'sometimes|nullable|exists:users,id',
+            'plugin_sites' => 'sometimes|array',
+            'plugin_sites.*.site_url' => 'required_with:plugin_sites|string|max:255',
+            'plugin_sites.*.platform' => 'nullable|string|max:100',
+            'plugin_sites.*.plugin_installed_at' => 'nullable|date',
         ]);
 
-        $merchant->update($request->all());
+        if (array_key_exists('agent_id', $data)) {
+            $agentId = $data['agent_id'];
+
+            if ($agentId) {
+                $agent = User::where('id', $agentId)->where('role', 'agent')->first();
+                if (!$agent) {
+                    return $this->errorResponse('Assigned agent must be a valid agent user', 422);
+                }
+            }
+        }
+
+        $pluginSites = null;
+        if (array_key_exists('plugin_sites', $data)) {
+            $pluginSites = collect($data['plugin_sites'] ?? [])
+                ->map(function (array $site) {
+                    return [
+                        'site_url' => trim($site['site_url']),
+                        'platform' => isset($site['platform']) ? trim((string) $site['platform']) : null,
+                        'plugin_installed_at' => $site['plugin_installed_at'] ?? null,
+                    ];
+                })
+                ->filter(fn ($site) => !empty($site['site_url']))
+                ->values();
+            unset($data['plugin_sites']);
+        }
+
+        $merchant->update($data);
 
         // Update verification timestamp if status changed to verified
-        if ($request->has('verification_status') && $request->verification_status === 'verified' && !$merchant->verified_at) {
+        if (
+            array_key_exists('verification_status', $data) &&
+            $data['verification_status'] === 'verified' &&
+            !$merchant->verified_at
+        ) {
             $merchant->update(['verified_at' => now()]);
         }
 
-        return $this->successResponse($merchant->load('user'), 'Merchant updated successfully');
+        if ($pluginSites !== null) {
+            $merchant->pluginSites()->delete();
+            if ($pluginSites->isNotEmpty()) {
+                $merchant->pluginSites()->createMany($pluginSites->all());
+            }
+        }
+
+        return $this->successResponse(
+            $merchant->load(['user', 'agent', 'pluginSites']),
+            'Merchant updated successfully'
+        );
     }
 
     /**
@@ -194,7 +294,24 @@ class MerchantController extends Controller
 
         $merchant = $user->merchant;
         if (!$merchant) {
-            return $this->errorResponse('Merchant profile not found', 404);
+            $merchant = $user->merchant()->create([
+                'business_name' => $user->name ? $user->name . ' Store' : 'New Merchant',
+                'business_id' => 'TEMP-' . $user->id,
+                'phone' => $user->phone ?? '',
+                'address' => [
+                    'name' => $user->name ?? 'Owner',
+                    'address' => '',
+                    'city' => '',
+                    'zip' => '',
+                    'phone' => $user->phone ?? '',
+                ],
+                'status' => 'active',
+                'verification_status' => 'pending',
+                'commission_rate' => 10,
+                'monthly_fee' => 0,
+                'balance' => 0,
+                'credit_limit' => 0,
+            ]);
         }
 
         $currentMonthOutstanding = $merchant->orders()
@@ -240,7 +357,24 @@ class MerchantController extends Controller
 
         $merchant = $user->merchant;
         if (!$merchant) {
-            return $this->errorResponse('Merchant profile not found', 404);
+            $merchant = $user->merchant()->create([
+                'business_name' => $user->name ? $user->name . ' Store' : 'New Merchant',
+                'business_id' => 'TEMP-' . $user->id,
+                'phone' => $user->phone ?? '',
+                'address' => [
+                    'name' => $user->name ?? 'Owner',
+                    'address' => '',
+                    'city' => '',
+                    'zip' => '',
+                    'phone' => $user->phone ?? '',
+                ],
+                'status' => 'active',
+                'verification_status' => 'pending',
+                'commission_rate' => 10,
+                'monthly_fee' => 0,
+                'balance' => 0,
+                'credit_limit' => 0,
+            ]);
         }
 
         return $this->successResponse($this->formatMerchantProfile($user, $merchant));
@@ -378,7 +512,7 @@ class MerchantController extends Controller
 
     protected function formatMerchantProfile(User $user, Merchant $merchant): array
     {
-        $merchant->loadMissing('user');
+        $merchant->loadMissing(['user', 'pluginSites', 'agent']);
 
         $billingAddress = is_array($merchant->address) ? $merchant->address : null;
         $shippingSettings = is_array($merchant->shipping_settings) ? $merchant->shipping_settings : null;
@@ -458,6 +592,7 @@ class MerchantController extends Controller
 
         return [
             'user' => $user->only(['id', 'name', 'email', 'phone']),
+            'agent' => $merchant->agent ? $merchant->agent->only(['id', 'name', 'email']) : null,
             'profile' => array_merge(
                 $merchant->only(['business_name', 'phone', 'business_id']),
                 [
@@ -477,6 +612,14 @@ class MerchantController extends Controller
                     'description' => $merchant->description ? trim($merchant->description) : null,
                 ]
             ),
+            'plugin_sites' => $merchant->pluginSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'site_url' => $site->site_url,
+                    'platform' => $site->platform,
+                    'plugin_installed_at' => $site->plugin_installed_at,
+                ];
+            }),
         ];
     }
 
