@@ -133,12 +133,14 @@ class OrderController extends Controller
             'source' => 'nullable|string|max:50',
             'source_reference' => 'nullable|string|max:100',
             'source_metadata' => 'nullable|array',
+            'shipping_cost' => 'nullable|numeric|min:0',
         ]);
 
         try {
             DB::beginTransaction();
 
             $user = $request->user();
+            $merchantId = $user->hasRole('merchant') ? (int) $user->id : null;
             $items = $request->items;
             $subtotal = 0;
 
@@ -150,21 +152,28 @@ class OrderController extends Controller
                     return $this->errorResponse("Insufficient stock for product: {$product->name}", 400);
                 }
 
-                $unitPrice = $product->getCurrentPrice();
+                $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantId)
+                    ?? $product->getCurrentPrice();
                 $itemTotal = $unitPrice * $item['quantity'];
                 $subtotal += $itemTotal;
             }
 
             // Calculate totals
             $tax = $subtotal * 0.17; // 17% VAT
-            $shippingCost = $request->shipping_type === 'pickup' ? 0 : 30; // Basic shipping cost
+            if ($request->shipping_type === 'pickup') {
+                $shippingCost = 0;
+            } elseif ($request->filled('shipping_cost')) {
+                $shippingCost = max(0, (float) $request->input('shipping_cost'));
+            } else {
+                $shippingCost = 30; // Basic default shipping cost
+            }
             $discount = 0; // Can be calculated based on discounts
             $total = $subtotal + $tax + $shippingCost - $discount;
 
             // Create order
             $order = Order::create([
                 'user_id' => $user->id,
-                'merchant_id' => $user->hasRole('merchant') ? $user->id : null,
+                'merchant_id' => $merchantId,
                 'agent_id' => $user->hasRole('agent') ? $user->id : null,
                 'source' => $request->input('source', 'manual'),
                 'source_reference' => $request->input('source_reference'),
@@ -186,7 +195,8 @@ class OrderController extends Controller
             // Create order items and update stock
             foreach ($items as $item) {
                 $product = Product::findOrFail($item['product_id']);
-                $unitPrice = $product->getCurrentPrice();
+                $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantId)
+                    ?? $product->getCurrentPrice();
                 $itemTotal = $unitPrice * $item['quantity'];
 
                 $order->items()->create([
@@ -214,6 +224,47 @@ class OrderController extends Controller
             DB::rollBack();
             return $this->errorResponse('Failed to create order: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Resolve merchant-specific price for a product if available.
+     */
+    protected function resolveMerchantUnitPrice(Product $product, ?int $merchantUserId): ?float
+    {
+        if (!$merchantUserId) {
+            return null;
+        }
+
+        $prices = $product->merchant_prices;
+        if (!is_array($prices) || empty($prices)) {
+            return null;
+        }
+
+        foreach ($prices as $entry) {
+            if (is_object($entry)) {
+                $entry = (array) $entry;
+            }
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $entryMerchantId = $entry['merchant_id'] ?? null;
+            if ($entryMerchantId === null) {
+                continue;
+            }
+
+            if ((int) $entryMerchantId !== $merchantUserId) {
+                continue;
+            }
+
+            $rawPrice = $entry['price'] ?? null;
+            if (is_numeric($rawPrice)) {
+                $price = (float) $rawPrice;
+                return $price >= 0 ? $price : null;
+            }
+        }
+
+        return null;
     }
 
     /**

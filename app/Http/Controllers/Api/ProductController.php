@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Traits\ApiResponse;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Merchant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
@@ -70,7 +71,7 @@ class ProductController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'sku' => 'required|string|unique:products,sku',
@@ -85,9 +86,19 @@ class ProductController extends Controller
             'variations' => 'nullable|array',
             'weight' => 'nullable|string',
             'dimensions' => 'nullable|string',
+            'merchant_prices' => 'nullable|array',
+            'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
+            'merchant_prices.*.price' => 'required|numeric|min:0',
+            'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
         ]);
 
-        $product = Product::create($request->all());
+        if ($request->has('merchant_prices')) {
+            $validated['merchant_prices'] = $this->normalizeMerchantPrices(
+                $request->input('merchant_prices', [])
+            );
+        }
+
+        $product = Product::create($validated);
 
         return $this->createdResponse($product->load('category'), 'Product created successfully');
     }
@@ -109,7 +120,7 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
 
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'sku' => 'sometimes|required|string|unique:products,sku,' . $id,
@@ -124,11 +135,105 @@ class ProductController extends Controller
             'variations' => 'nullable|array',
             'weight' => 'nullable|string',
             'dimensions' => 'nullable|string',
+            'merchant_prices' => 'nullable|array',
+            'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
+            'merchant_prices.*.price' => 'required|numeric|min:0',
+            'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
         ]);
 
-        $product->update($request->all());
+        if ($request->has('merchant_prices')) {
+            $validated['merchant_prices'] = $this->normalizeMerchantPrices(
+                $request->input('merchant_prices', [])
+            );
+        }
+
+        $product->update($validated);
 
         return $this->successResponse($product->load('category'), 'Product updated successfully');
+    }
+
+    /**
+     * Normalize merchant price payload.
+     */
+    protected function normalizeMerchantPrices(array $rawPrices): array
+    {
+        if (empty($rawPrices)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($rawPrices as $row) {
+            if (is_object($row)) {
+                $row = (array) $row;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            $rows[] = $row;
+        }
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $merchantIds = [];
+        foreach ($rows as $row) {
+            if (!isset($row['merchant_id'])) {
+                continue;
+            }
+            $merchantId = (int) $row['merchant_id'];
+            if ($merchantId > 0) {
+                $merchantIds[] = $merchantId;
+            }
+        }
+
+        $merchantIds = array_values(array_unique($merchantIds));
+
+        $namesByUserId = [];
+        if (!empty($merchantIds)) {
+            $namesByUserId = Merchant::whereIn('user_id', $merchantIds)
+                ->get(['user_id', 'business_name'])
+                ->mapWithKeys(function (Merchant $merchant) {
+                    $name = $merchant->business_name ? trim($merchant->business_name) : null;
+                    return [$merchant->user_id => $name];
+                })
+                ->toArray();
+        }
+
+        $normalized = [];
+
+        foreach ($rows as $row) {
+            if (!isset($row['merchant_id'], $row['price'])) {
+                continue;
+            }
+
+            $merchantId = (int) $row['merchant_id'];
+            if ($merchantId <= 0) {
+                continue;
+            }
+
+            $price = is_numeric($row['price']) ? (float) $row['price'] : null;
+            if ($price === null || $price < 0) {
+                continue;
+            }
+
+            $merchantName = null;
+            if (isset($row['merchant_name']) && is_string($row['merchant_name'])) {
+                $merchantName = trim($row['merchant_name']);
+            }
+
+            if (!$merchantName && isset($namesByUserId[$merchantId])) {
+                $merchantName = $namesByUserId[$merchantId];
+            }
+
+            $normalized[$merchantId] = [
+                'merchant_id' => $merchantId,
+                'price' => round($price, 2),
+                'merchant_name' => $merchantName,
+            ];
+        }
+
+        return array_values($normalized);
     }
 
     /**

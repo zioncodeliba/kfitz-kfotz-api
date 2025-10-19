@@ -22,6 +22,7 @@ class Product extends Model
         'variations',
         'weight',
         'dimensions',
+        'merchant_prices',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class Product extends Model
         'is_featured' => 'boolean',
         'images' => 'array',
         'variations' => 'array',
+        'merchant_prices' => 'array',
     ];
 
     // Category relationship
