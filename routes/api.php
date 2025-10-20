@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MerchantController;
 use App\Http\Controllers\Api\ShipmentController;
+use App\Http\Controllers\Api\PluginSiteController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
 
@@ -88,6 +89,8 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::post('/shipping-carriers/{id}/calculate-cost', [ShippingCarrierController::class, 'calculateCost']);
     Route::get('/merchant/shipping-settings', [MerchantController::class, 'getShippingSettings']);
     Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
+    Route::get('/plugin-sites', [PluginSiteController::class, 'index']);
+    Route::post('/plugin-sites', [PluginSiteController::class, 'store']);
     
 });
 

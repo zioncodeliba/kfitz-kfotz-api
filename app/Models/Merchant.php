@@ -65,7 +65,7 @@ class Merchant extends Model
 
     public function pluginSites(): HasMany
     {
-        return $this->hasMany(MerchantSite::class);
+        return $this->hasMany(MerchantSite::class, 'user_id', 'user_id');
     }
 
     // Status methods

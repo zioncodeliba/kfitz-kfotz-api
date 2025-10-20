@@ -102,8 +102,14 @@ class MerchantController extends Controller
             'credit_limit' => 'numeric|min:0',
             'plugin_sites' => 'nullable|array',
             'plugin_sites.*.site_url' => 'required|string|max:255',
+            'plugin_sites.*.name' => 'nullable|string|max:255',
+            'plugin_sites.*.contact_name' => 'nullable|string|max:255',
+            'plugin_sites.*.contact_phone' => 'nullable|string|max:50',
             'plugin_sites.*.platform' => 'nullable|string|max:100',
             'plugin_sites.*.plugin_installed_at' => 'nullable|date',
+            'plugin_sites.*.status' => 'nullable|string|max:50',
+            'plugin_sites.*.balance' => 'nullable|numeric',
+            'plugin_sites.*.credit_limit' => 'nullable|numeric',
         ]);
 
         $merchantUser = User::findOrFail($data['user_id']);
@@ -127,8 +133,16 @@ class MerchantController extends Controller
             ->map(function (array $site) {
                 return [
                     'site_url' => trim($site['site_url']),
+                    'name' => isset($site['name']) ? trim((string) $site['name']) : null,
+                    'contact_name' => isset($site['contact_name']) ? trim((string) $site['contact_name']) : null,
+                    'contact_phone' => isset($site['contact_phone']) ? trim((string) $site['contact_phone']) : null,
                     'platform' => isset($site['platform']) ? trim((string) $site['platform']) : null,
                     'plugin_installed_at' => $site['plugin_installed_at'] ?? null,
+                    'status' => isset($site['status']) && trim((string) $site['status']) !== ''
+                        ? trim((string) $site['status'])
+                        : 'active',
+                    'balance' => isset($site['balance']) ? (float) $site['balance'] : 0,
+                    'credit_limit' => isset($site['credit_limit']) ? (float) $site['credit_limit'] : 0,
                 ];
             })
             ->filter(fn ($site) => !empty($site['site_url']))
@@ -139,7 +153,14 @@ class MerchantController extends Controller
         $merchant = Merchant::create($data);
 
         if ($pluginSites->isNotEmpty()) {
-            $merchant->pluginSites()->createMany($pluginSites->all());
+            $merchant->pluginSites()->createMany(
+                $pluginSites
+                    ->map(function (array $site) use ($merchant) {
+                        $site['user_id'] = $merchant->user_id;
+                        return $site;
+                    })
+                    ->all()
+            );
         }
 
         return $this->createdResponse(
@@ -209,8 +230,14 @@ class MerchantController extends Controller
             'agent_id' => 'sometimes|nullable|exists:users,id',
             'plugin_sites' => 'sometimes|array',
             'plugin_sites.*.site_url' => 'required_with:plugin_sites|string|max:255',
+            'plugin_sites.*.name' => 'nullable|string|max:255',
+            'plugin_sites.*.contact_name' => 'nullable|string|max:255',
+            'plugin_sites.*.contact_phone' => 'nullable|string|max:50',
             'plugin_sites.*.platform' => 'nullable|string|max:100',
             'plugin_sites.*.plugin_installed_at' => 'nullable|date',
+            'plugin_sites.*.status' => 'nullable|string|max:50',
+            'plugin_sites.*.balance' => 'nullable|numeric',
+            'plugin_sites.*.credit_limit' => 'nullable|numeric',
         ]);
 
         if (array_key_exists('agent_id', $data)) {
@@ -230,8 +257,16 @@ class MerchantController extends Controller
                 ->map(function (array $site) {
                     return [
                         'site_url' => trim($site['site_url']),
+                        'name' => isset($site['name']) ? trim((string) $site['name']) : null,
+                        'contact_name' => isset($site['contact_name']) ? trim((string) $site['contact_name']) : null,
+                        'contact_phone' => isset($site['contact_phone']) ? trim((string) $site['contact_phone']) : null,
                         'platform' => isset($site['platform']) ? trim((string) $site['platform']) : null,
                         'plugin_installed_at' => $site['plugin_installed_at'] ?? null,
+                        'status' => isset($site['status']) && trim((string) $site['status']) !== ''
+                            ? trim((string) $site['status'])
+                            : 'active',
+                        'balance' => isset($site['balance']) ? (float) $site['balance'] : 0,
+                        'credit_limit' => isset($site['credit_limit']) ? (float) $site['credit_limit'] : 0,
                     ];
                 })
                 ->filter(fn ($site) => !empty($site['site_url']))
@@ -253,7 +288,14 @@ class MerchantController extends Controller
         if ($pluginSites !== null) {
             $merchant->pluginSites()->delete();
             if ($pluginSites->isNotEmpty()) {
-                $merchant->pluginSites()->createMany($pluginSites->all());
+                $merchant->pluginSites()->createMany(
+                    $pluginSites
+                        ->map(function (array $site) use ($merchant) {
+                            $site['user_id'] = $merchant->user_id;
+                            return $site;
+                        })
+                        ->all()
+                );
             }
         }
 
@@ -294,24 +336,7 @@ class MerchantController extends Controller
 
         $merchant = $user->merchant;
         if (!$merchant) {
-            $merchant = $user->merchant()->create([
-                'business_name' => $user->name ? $user->name . ' Store' : 'New Merchant',
-                'business_id' => 'TEMP-' . $user->id,
-                'phone' => $user->phone ?? '',
-                'address' => [
-                    'name' => $user->name ?? 'Owner',
-                    'address' => '',
-                    'city' => '',
-                    'zip' => '',
-                    'phone' => $user->phone ?? '',
-                ],
-                'status' => 'active',
-                'verification_status' => 'pending',
-                'commission_rate' => 10,
-                'monthly_fee' => 0,
-                'balance' => 0,
-                'credit_limit' => 0,
-            ]);
+            return $this->errorResponse('Merchant profile not found', 404);
         }
 
         $currentMonthOutstanding = $merchant->orders()
@@ -357,24 +382,12 @@ class MerchantController extends Controller
 
         $merchant = $user->merchant;
         if (!$merchant) {
-            $merchant = $user->merchant()->create([
-                'business_name' => $user->name ? $user->name . ' Store' : 'New Merchant',
-                'business_id' => 'TEMP-' . $user->id,
-                'phone' => $user->phone ?? '',
-                'address' => [
-                    'name' => $user->name ?? 'Owner',
-                    'address' => '',
-                    'city' => '',
-                    'zip' => '',
-                    'phone' => $user->phone ?? '',
-                ],
-                'status' => 'active',
-                'verification_status' => 'pending',
-                'commission_rate' => 10,
-                'monthly_fee' => 0,
-                'balance' => 0,
-                'credit_limit' => 0,
-            ]);
+            return $this->successResponse([
+                'user' => $user->only(['id', 'name', 'email', 'phone']),
+                'agent' => null,
+                'profile' => null,
+                'plugin_sites' => [],
+            ], 'Merchant profile not found');
         }
 
         return $this->successResponse($this->formatMerchantProfile($user, $merchant));
@@ -615,9 +628,16 @@ class MerchantController extends Controller
             'plugin_sites' => $merchant->pluginSites->map(function ($site) {
                 return [
                     'id' => $site->id,
+                    'user_id' => $site->user_id,
                     'site_url' => $site->site_url,
+                    'name' => $site->name,
+                    'contact_name' => $site->contact_name,
+                    'contact_phone' => $site->contact_phone,
                     'platform' => $site->platform,
                     'plugin_installed_at' => $site->plugin_installed_at,
+                    'status' => $site->status,
+                    'balance' => $site->balance,
+                    'credit_limit' => $site->credit_limit,
                 ];
             }),
         ];

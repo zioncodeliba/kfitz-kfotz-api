@@ -80,9 +80,16 @@ class UserResource extends JsonResource
                         ? $this->merchant->pluginSites->map(function ($site) {
                             return [
                                 'id' => $site->id,
+                                'user_id' => $site->user_id,
                                 'site_url' => $site->site_url,
+                                'name' => $site->name,
+                                'contact_name' => $site->contact_name,
+                                'contact_phone' => $site->contact_phone,
                                 'platform' => $site->platform,
                                 'plugin_installed_at' => $site->plugin_installed_at,
+                                'status' => $site->status,
+                                'balance' => $site->balance,
+                                'credit_limit' => $site->credit_limit,
                             ];
                         })
                         : [],
