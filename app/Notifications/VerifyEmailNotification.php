@@ -15,6 +15,9 @@ class VerifyEmailNotification extends VerifyEmail
 {
     use Queueable;
 
+    protected ?MailMessage $lastMailMessage = null;
+    protected ?string $resolvedVerificationUrl = null;
+
     /**
      * Create a new notification instance.
      */
@@ -32,7 +35,7 @@ class VerifyEmailNotification extends VerifyEmail
     public function toMail($notifiable)
     {
         $verificationUrl = $this->verificationUrl($notifiable);
-        
+
         // כתיבה ללוג למידע נוסף
         Log::info('Email verification link generated', [
             'user_id' => $notifiable->id,
@@ -40,9 +43,12 @@ class VerifyEmailNotification extends VerifyEmail
             'verification_url' => $verificationUrl,
             'expires_at' => Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60))
         ]);
-        
+
         // שליחת מייל אמיתי
-        return $this->buildMailMessage($verificationUrl);
+        $mailMessage = $this->buildMailMessage($verificationUrl);
+        $this->lastMailMessage = $mailMessage;
+
+        return $mailMessage;
     }
 
     /**
@@ -60,6 +66,20 @@ class VerifyEmailNotification extends VerifyEmail
             ->line('If you did not create an account, no further action is required.');
     }
 
+    public function getMailMessage(): ?MailMessage
+    {
+        return $this->lastMailMessage;
+    }
+
+    public function previewFor($notifiable): array
+    {
+        $url = $this->verificationUrl($notifiable);
+        $mailMessage = $this->buildMailMessage($url);
+        $this->lastMailMessage = $mailMessage;
+
+        return [$mailMessage, $url];
+    }
+
     /**
      * Get the verification URL for the given notifiable.
      *
@@ -68,10 +88,15 @@ class VerifyEmailNotification extends VerifyEmail
      */
     protected function verificationUrl($notifiable)
     {
+        if ($this->resolvedVerificationUrl !== null) {
+            return $this->resolvedVerificationUrl;
+        }
+
         $frontendUrl = config('app.verification_url');
         
         if (static::$createUrlCallback) {
-            return call_user_func(static::$createUrlCallback, $notifiable);
+            $this->resolvedVerificationUrl = call_user_func(static::$createUrlCallback, $notifiable);
+            return $this->resolvedVerificationUrl;
         }
 
         $verificationUrl = URL::temporarySignedRoute(
@@ -83,13 +108,11 @@ class VerifyEmailNotification extends VerifyEmail
             ]
         );
 
-        // Extract the query parameters from the Laravel URL
         $queryString = parse_url($verificationUrl, PHP_URL_QUERY);
-        
-        // Add the user ID to the query string
         $queryString .= '&id=' . $notifiable->getKey();
-        
-        // Construct the frontend URL with the verification parameters
-        return $frontendUrl . '/api/verify-email?' . $queryString;
+
+        $this->resolvedVerificationUrl = $frontendUrl . '/api/verify-email?' . $queryString;
+
+        return $this->resolvedVerificationUrl;
     }
-} 
+}

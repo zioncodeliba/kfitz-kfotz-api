@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MerchantController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\PluginSiteController;
+use App\Http\Controllers\Api\PluginOrderController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
 
@@ -119,6 +120,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/merchants/{id}', [MerchantController::class, 'show']);
     Route::put('/merchants/{id}', [MerchantController::class, 'update']);
     Route::delete('/merchants/{id}', [MerchantController::class, 'destroy']);
+});
+
+Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {
+    Route::post('/plugin/orders', [PluginOrderController::class, 'store']);
 });
 
 // Merchant routes (for merchants)

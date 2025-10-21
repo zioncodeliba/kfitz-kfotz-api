@@ -48,9 +48,23 @@ class EmailVerificationController extends Controller
             return $this->errorResponse('Email already verified', 400);
         }
 
-        $user->sendEmailVerificationNotification();
+        $notification = new VerifyEmailNotification();
+        [$mailMessage, $verificationUrl] = $notification->previewFor($user);
 
-        return $this->successResponse('Verification link sent!');
+        $user->notify($notification);
+
+        $preview = $mailMessage ? [
+            'subject' => $mailMessage->subject,
+            'greeting' => $mailMessage->greeting,
+            'intro_lines' => $mailMessage->introLines,
+            'action_text' => $mailMessage->actionText,
+            'action_url' => $verificationUrl,
+            'outro_lines' => $mailMessage->outroLines,
+        ] : null;
+
+        return $this->successResponse([
+            'email_preview' => $preview,
+        ], 'Verification link sent!');
     }
 
     /**

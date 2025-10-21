@@ -898,11 +898,11 @@
 						}
 					}
 				},
-				{
-					"name": "Create Order",
-					"request": {
-						"method": "POST",
-						"header": [
+			{
+				"name": "Create Order",
+				"request": {
+					"method": "POST",
+					"header": [
 							{
 								"key": "Authorization",
 								"value": "Bearer {{token}}"
@@ -926,10 +926,41 @@
 								"orders"
 							]
 						}
+				}
+			},
+			{
+				"name": "Create Plugin Order",
+				"request": {
+					"method": "POST",
+					"header": [
+						{
+							"key": "Authorization",
+							"value": "Bearer {{merchant_token}}"
+						},
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"body": {
+						"mode": "raw",
+						"raw": "{\n    \"site_url\": \"https://demo-store.example.com\",\n    \"external_id\": \"PLUGIN-ORDER-123\",\n    \"customer\": {\n        \"name\": \"לקוח פלאגין\",\n        \"phone\": \"050-1234567\",\n        \"email\": \"customer@example.com\",\n        \"address\": {\n            \"line1\": \"רחוב הדגמה 10\",\n            \"city\": \"תל אביב\",\n            \"zip\": \"6100000\",\n            \"country\": \"ישראל\"\n        }\n    },\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"sku\": \"SKU-123\",\n            \"quantity\": 2\n        }\n    ],\n    \"notes\": \"נוצר אוטומטית מהפלאגין\"\n}"
+					},
+					"url": {
+						"raw": "{{base_url}}/api/plugin/orders",
+						"host": [
+							"{{base_url}}"
+						],
+						"path": [
+							"api",
+							"plugin",
+							"orders"
+						]
 					}
-				},
-				{
-					"name": "Get Order",
+				}
+			},
+			{
+				"name": "Get Order",
 					"request": {
 						"method": "GET",
 						"header": [
@@ -1862,6 +1893,11 @@
 		{
 			"key": "admin_token",
 			"value": "your_admin_token_here",
+			"type": "string"
+		},
+		{
+			"key": "merchant_token",
+			"value": "your_merchant_token_here",
 			"type": "string"
 		},
 		{
