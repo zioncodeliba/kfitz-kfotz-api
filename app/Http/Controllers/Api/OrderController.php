@@ -84,7 +84,7 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user', 'merchant', 'agent']);
+        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer']);
 
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
         $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
@@ -124,7 +124,7 @@ class OrderController extends Controller
     public function openOrders(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user', 'merchant', 'agent'])
+        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer'])
             ->whereIn('status', ['pending', 'confirmed', 'processing']);
 
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
@@ -373,7 +373,7 @@ class OrderController extends Controller
     public function show(Request $request, string $id)
     {
         $user = $request->user();
-        $order = Order::with(['items.product', 'user', 'merchant', 'agent'])->findOrFail($id);
+        $order = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer'])->findOrFail($id);
 
         // Check permissions
         if ($user->hasRole('admin')) {
@@ -481,7 +481,7 @@ class OrderController extends Controller
     public function byStatus(Request $request, $status)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user']);
+        $query = Order::with(['items.product', 'user', 'merchantCustomer']);
 
         // Apply role-based filtering
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
@@ -811,7 +811,13 @@ class OrderController extends Controller
     {
         $user = $request->user();
 
-        $query = Shipment::with(['order.items.product', 'order.user', 'order.merchant', 'carrier'])
+        $query = Shipment::with([
+                'order.items.product',
+                'order.user',
+                'order.merchant',
+                'order.merchantCustomer',
+                'carrier',
+            ])
             ->whereIn('status', Shipment::ACTIVE_STATUSES)
             ->whereHas('order', function ($orderQuery) {
                 $orderQuery->where('status', Order::STATUS_SHIPPED);
@@ -863,7 +869,13 @@ class OrderController extends Controller
     {
         $user = $request->user();
 
-        $query = Shipment::with(['order.items.product', 'order.user', 'order.merchant', 'carrier'])
+        $query = Shipment::with([
+                'order.items.product',
+                'order.user',
+                'order.merchant',
+                'order.merchantCustomer',
+                'carrier',
+            ])
             ->whereIn('status', Shipment::FINAL_STATUSES)
             ->whereHas('order', function ($orderQuery) {
                 $orderQuery->where('status', Order::STATUS_DELIVERED);
@@ -916,7 +928,7 @@ class OrderController extends Controller
      */
     public function getShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {
@@ -959,7 +971,7 @@ class OrderController extends Controller
      */
     public function updateShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {

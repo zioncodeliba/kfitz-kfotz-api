@@ -60,6 +60,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Merchant::class, 'agent_id');
     }
 
+    public function merchantCustomers(): HasMany
+    {
+        return $this->hasMany(MerchantCustomer::class, 'merchant_user_id');
+    }
+
     /**
      * Send the email verification notification.
      *

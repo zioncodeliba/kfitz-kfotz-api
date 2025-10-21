@@ -68,6 +68,11 @@ class Merchant extends Model
         return $this->hasMany(MerchantSite::class, 'user_id', 'user_id');
     }
 
+    public function customers(): HasMany
+    {
+        return $this->hasMany(MerchantCustomer::class, 'merchant_user_id', 'user_id');
+    }
+
     // Status methods
     public function isActive(): bool
     {

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MerchantController;
+use App\Http\Controllers\Api\MerchantCustomerController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\PluginSiteController;
 use App\Http\Controllers\Api\PluginOrderController;
@@ -120,6 +121,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/merchants/{id}', [MerchantController::class, 'show']);
     Route::put('/merchants/{id}', [MerchantController::class, 'update']);
     Route::delete('/merchants/{id}', [MerchantController::class, 'destroy']);
+
+    Route::get('/merchant/customers', [MerchantCustomerController::class, 'index']);
+    Route::get('/merchant/customers/{customer}', [MerchantCustomerController::class, 'show'])
+        ->whereNumber('customer');
+    Route::put('/merchant/customers/{customer}', [MerchantCustomerController::class, 'update'])
+        ->whereNumber('customer');
+    Route::patch('/merchant/customers/{customer}', [MerchantCustomerController::class, 'update'])
+        ->whereNumber('customer');
 });
 
 Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {

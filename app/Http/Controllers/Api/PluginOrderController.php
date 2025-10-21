@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\MerchantCustomer;
 use App\Models\MerchantSite;
 use App\Models\Order;
 use App\Models\Product;
@@ -115,9 +116,12 @@ class PluginOrderController extends Controller
             $discount = (float) ($totalsInput['discount'] ?? 0);
             $total = (float) ($totalsInput['total'] ?? ($subtotal + $tax + $shippingCost - $discount));
 
+            $merchantCustomer = $this->syncMerchantCustomer($merchantUser->id, $data['customer']);
+
             $order = Order::create([
                 'user_id' => $merchantUser->id,
                 'merchant_id' => $merchantUser->id,
+                'merchant_customer_id' => $merchantCustomer->id,
                 'status' => Order::STATUS_PENDING,
                 'payment_status' => 'pending',
                 'source' => 'plugin',
@@ -168,6 +172,77 @@ class PluginOrderController extends Controller
 
             return $this->errorResponse('Failed to create order from plugin', 500);
         }
+    }
+
+    protected function syncMerchantCustomer(int $merchantUserId, array $customerData): MerchantCustomer
+    {
+        $name = trim($customerData['name']);
+        $email = isset($customerData['email']) ? strtolower(trim($customerData['email'])) : null;
+        $email = $email === '' ? null : $email;
+        $phone = isset($customerData['phone']) ? $this->normalizePhone($customerData['phone']) : null;
+
+        $query = MerchantCustomer::where('merchant_user_id', $merchantUserId);
+
+        if ($email && $phone) {
+            $query->where('email', $email)->where('phone', $phone);
+        } else {
+            if ($email) {
+                $query->where('email', $email);
+            }
+
+            if ($phone) {
+                $query->where('phone', $phone);
+            }
+        }
+
+        $existingCustomer = $query->first();
+
+        $payload = [
+            'merchant_user_id' => $merchantUserId,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'notes' => $customerData['notes'] ?? null,
+            'address' => $customerData['address'] ?? null,
+        ];
+
+        if ($existingCustomer) {
+            $updates = [];
+
+            foreach (['name', 'email', 'phone'] as $attribute) {
+                $value = $payload[$attribute];
+                if ($value !== null && $existingCustomer->{$attribute} !== $value) {
+                    $updates[$attribute] = $value;
+                }
+            }
+
+            if (isset($payload['notes']) && $payload['notes'] !== null && $existingCustomer->notes !== $payload['notes']) {
+                $updates['notes'] = $payload['notes'];
+            }
+
+            if (is_array($payload['address']) && $existingCustomer->address != $payload['address']) {
+                $updates['address'] = $payload['address'];
+            }
+
+            if (!empty($updates)) {
+                $existingCustomer->fill($updates)->save();
+            }
+
+            return $existingCustomer;
+        }
+
+        return MerchantCustomer::create($payload);
+    }
+
+    protected function normalizePhone(?string $phone): ?string
+    {
+        if ($phone === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        return $digits !== '' ? $digits : null;
     }
 
     protected function resolveMerchantUnitPrice(Product $product, int $merchantUserId): ?float
