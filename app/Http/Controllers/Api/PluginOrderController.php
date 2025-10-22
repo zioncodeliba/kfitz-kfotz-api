@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Merchant;
 use App\Models\MerchantCustomer;
 use App\Models\MerchantSite;
 use App\Models\Order;
@@ -47,6 +48,10 @@ class PluginOrderController extends Controller
             'totals.shipping_cost' => 'nullable|numeric|min:0',
             'totals.discount' => 'nullable|numeric|min:0',
             'totals.total' => 'nullable|numeric|min:0',
+            'shipping' => 'nullable|array',
+            'shipping.method' => 'nullable|string|max:100',
+            'shipping.type' => 'nullable|string|max:50',
+            'shipping.cost' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
         ]);
 
@@ -65,6 +70,8 @@ class PluginOrderController extends Controller
             return $this->errorResponse('Merchant user not found for the provided site', 422);
         }
 
+        $merchantProfile = $merchantUser->merchant;
+
         try {
             DB::beginTransaction();
 
@@ -81,14 +88,25 @@ class PluginOrderController extends Controller
             $computedSubtotal = 0;
             $orderItemsPayload = [];
 
-            $items->each(function (array $item) use (&$orderItemsPayload, &$computedSubtotal, $merchantUser, $products) {
-                $productId = (int) $item['product_id'];
-                $product = $products->get($productId);
-                if (!$product) {
-                    return;
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    continue;
                 }
 
-                $quantity = max((float) $item['quantity'], 0.0001);
+                $productId = (int) ($item['product_id'] ?? 0);
+                $product = $products->get($productId);
+                if (!$product) {
+                    DB::rollBack();
+                    return $this->errorResponse('One or more products were not found for this merchant.', 422);
+                }
+
+                $quantity = max((float) ($item['quantity'] ?? 0), 0.0001);
+
+                if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                    DB::rollBack();
+                    return $this->errorResponse(sprintf('Insufficient stock for product: %s', $product->name), 400);
+                }
+
                 $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantUser->id)
                     ?? $product->getCurrentPrice();
                 $totalPrice = $unitPrice * $quantity;
@@ -107,14 +125,33 @@ class PluginOrderController extends Controller
                         'images' => $product->images,
                     ],
                 ];
-            });
+            }
 
             $totalsInput = $data['totals'] ?? [];
+            $shippingInput = is_array($data['shipping'] ?? null) ? $data['shipping'] : [];
+
             $subtotal = (float) ($totalsInput['subtotal'] ?? $computedSubtotal);
-            $tax = (float) ($totalsInput['tax'] ?? 0);
-            $shippingCost = (float) ($totalsInput['shipping_cost'] ?? 0);
+            if ($subtotal < 0) {
+                $subtotal = 0;
+            }
+
+            $tax = (float) ($totalsInput['tax'] ?? round($subtotal * 0.17, 2));
+            if ($tax < 0) {
+                $tax = 0;
+            }
+
             $discount = (float) ($totalsInput['discount'] ?? 0);
+            if ($discount < 0) {
+                $discount = 0;
+            }
+
+            $shippingContext = $this->resolveShippingContext($merchantProfile, $totalsInput, $shippingInput);
+            $shippingCost = $shippingContext['cost'];
+
             $total = (float) ($totalsInput['total'] ?? ($subtotal + $tax + $shippingCost - $discount));
+            if ($total <= 0) {
+                $total = $subtotal + $tax + $shippingCost - $discount;
+            }
 
             $merchantCustomer = $this->syncMerchantCustomer($merchantUser->id, $data['customer']);
 
@@ -142,6 +179,11 @@ class PluginOrderController extends Controller
                         'address' => $data['customer']['address'],
                         'notes' => $data['customer']['notes'] ?? null,
                     ],
+                    'shipping' => [
+                        'type' => $shippingContext['type'],
+                        'method' => $shippingContext['method'],
+                        'cost' => $shippingCost,
+                    ],
                     'initiator' => [
                         'id' => $user->id,
                         'name' => $user->name,
@@ -150,6 +192,8 @@ class PluginOrderController extends Controller
                 ],
                 'shipping_address' => $data['customer']['address'],
                 'billing_address' => $data['customer']['address'],
+                'shipping_type' => $shippingContext['type'],
+                'shipping_method' => $shippingContext['method'],
                 'subtotal' => $subtotal,
                 'tax' => $tax,
                 'shipping_cost' => $shippingCost,
@@ -159,6 +203,15 @@ class PluginOrderController extends Controller
             ]);
 
             $order->items()->createMany($orderItemsPayload);
+            foreach ($orderItemsPayload as $itemPayload) {
+                $product = $products->get($itemPayload['product_id']);
+                if ($product) {
+                    $quantityToDecrement = (float) $itemPayload['quantity'];
+                    if ($quantityToDecrement > 0) {
+                        $product->decrement('stock_quantity', $quantityToDecrement);
+                    }
+                }
+            }
 
             DB::commit();
 
@@ -172,6 +225,113 @@ class PluginOrderController extends Controller
 
             return $this->errorResponse('Failed to create order from plugin', 500);
         }
+    }
+
+    protected function resolveShippingContext(?Merchant $merchant, array $totalsInput, array $shippingInput): array
+    {
+        $type = isset($shippingInput['type']) ? strtolower(trim((string) $shippingInput['type'])) : null;
+        if (!in_array($type, ['delivery', 'pickup'], true)) {
+            $type = 'delivery';
+        }
+
+        $method = isset($shippingInput['method']) ? strtolower(trim((string) $shippingInput['method'])) : null;
+        $method = $this->normalizeShippingMethod($method, $type);
+
+        $cost = null;
+
+        if (array_key_exists('cost', $shippingInput) && is_numeric($shippingInput['cost'])) {
+            $cost = max(0, (float) $shippingInput['cost']);
+        }
+
+        if ($cost === null && array_key_exists('shipping_cost', $totalsInput) && $totalsInput['shipping_cost'] !== null) {
+            $candidate = $totalsInput['shipping_cost'];
+            if (is_numeric($candidate)) {
+                $cost = max(0, (float) $candidate);
+            }
+        }
+
+        if ($type === 'pickup') {
+            $cost = 0.0;
+        }
+
+        if ($cost === null && $merchant) {
+            $cost = $this->resolveShippingCostFromSettings($merchant, $method, $type);
+        }
+
+        if ($cost === null) {
+            $cost = 0.0;
+        }
+
+        return [
+            'type' => $type,
+            'method' => $method,
+            'cost' => $cost,
+        ];
+    }
+
+    protected function normalizeShippingMethod(?string $method, string $type): string
+    {
+        if ($type === 'pickup') {
+            return 'pickup';
+        }
+
+        $normalized = match ($method) {
+            'pickup', 'self', 'self_pickup', 'collection' => 'pickup',
+            'express', 'fast', 'same-day', 'overnight' => 'express',
+            'regular', 'standard', 'delivery', 'courier', 'door', 'door_to_door' => 'regular',
+            default => null,
+        };
+
+        if ($normalized) {
+            return $normalized;
+        }
+
+        return 'regular';
+    }
+
+    protected function resolveShippingCostFromSettings(Merchant $merchant, ?string $serviceType, ?string $shippingType): ?float
+    {
+        $settings = $merchant->shipping_settings ?? [];
+        $units = $settings['shipping_units'] ?? [];
+
+        $unitsCollection = collect(is_array($units) ? $units : [])
+            ->filter(function ($unit) {
+                return is_array($unit) && isset($unit['price']) && is_numeric($unit['price']);
+            });
+
+        $match = null;
+
+        if ($serviceType) {
+            $match = $unitsCollection->first(function ($unit) use ($serviceType) {
+                return isset($unit['service_type'])
+                    && strcasecmp((string) $unit['service_type'], $serviceType) === 0;
+            });
+        }
+
+        if (!$match && $shippingType) {
+            $match = $unitsCollection->first(function ($unit) use ($shippingType) {
+                return isset($unit['destination'])
+                    && strcasecmp((string) $unit['destination'], $shippingType) === 0;
+            });
+        }
+
+        if (!$match) {
+            $match = $unitsCollection->first();
+        }
+
+        if ($match && isset($match['price']) && is_numeric($match['price'])) {
+            return max(0, (float) $match['price']);
+        }
+
+        if (isset($settings['default_shipping_price']) && is_numeric($settings['default_shipping_price'])) {
+            return max(0, (float) $settings['default_shipping_price']);
+        }
+
+        if (isset($settings['default_shipping_cost']) && is_numeric($settings['default_shipping_cost'])) {
+            return max(0, (float) $settings['default_shipping_cost']);
+        }
+
+        return null;
     }
 
     protected function syncMerchantCustomer(int $merchantUserId, array $customerData): MerchantCustomer

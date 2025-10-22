@@ -18,10 +18,24 @@ class UserSeeder extends Seeder
                 'role' => 'admin',
             ],
             [
-                'name'  => 'Primary Merchant',
-                'email' => 'merchant@example.com',
+                'name'  => 'אור',
+                'email' => 'or@example.com',
                 'password' => '12345678',
-                'phone' => '+972500000002',
+                'phone' => '+972500000012',
+                'role' => 'merchant',
+            ],
+            [
+                'name'  => 'עמית',
+                'email' => 'amit@example.com',
+                'password' => '12345678',
+                'phone' => '+972500000022',
+                'role' => 'merchant',
+            ],
+            [
+                'name'  => 'ירון',
+                'email' => 'yaron@example.com',
+                'password' => '12345678',
+                'phone' => '+972500000032',
                 'role' => 'merchant',
             ],
             [
