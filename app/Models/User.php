@@ -20,6 +20,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'phone',
         'password',
         'role',
+        'order_limit',
+        'order_balance',
     ];
 
     protected $hidden = [
@@ -32,7 +34,35 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'order_limit' => 'decimal:2',
+            'order_balance' => 'decimal:2',
         ];
+    }
+
+    public function currentMonthOrderTotal(): float
+    {
+        return (float) $this->orders()
+            ->whereYear('created_at', now()->year)
+            ->whereMonth('created_at', now()->month)
+            ->whereNotIn('status', [
+                Order::STATUS_CANCELLED,
+                Order::STATUS_REFUNDED,
+            ])
+            ->sum('total');
+    }
+
+    public function refreshOrderFinancials(?float $usage = null): void
+    {
+        $usage ??= $this->currentMonthOrderTotal();
+        $balance = round((float) $this->order_limit - $usage, 2);
+
+        $this->forceFill([
+            'order_balance' => $balance,
+        ])->save();
+
+        $this->merchant()
+            ->whereNotNull('id')
+            ->update(['balance' => $balance]);
     }
 
     public function hasRole(string $roleName): bool

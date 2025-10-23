@@ -24,7 +24,6 @@ class Merchant extends Model
         'commission_rate',
         'monthly_fee',
         'balance',
-        'credit_limit',
         'payment_methods',
         'shipping_settings',
         'banner_settings',
@@ -42,10 +41,35 @@ class Merchant extends Model
         'commission_rate' => 'decimal:2',
         'monthly_fee' => 'decimal:2',
         'balance' => 'decimal:2',
-        'credit_limit' => 'decimal:2',
         'verified_at' => 'datetime',
         'last_payment_at' => 'datetime',
     ];
+
+    public function getCreditLimitAttribute($value)
+    {
+        if ($this->relationLoaded('user') && $this->user) {
+            return $this->user->order_limit;
+        }
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        return $this->user?->order_limit;
+    }
+
+    public function getBalanceAttribute($value)
+    {
+        if ($this->relationLoaded('user') && $this->user) {
+            return $this->user->order_balance;
+        }
+
+        if ($value !== null) {
+            return $value;
+        }
+
+        return $this->user?->order_balance;
+    }
 
     // Relationships
     public function user(): BelongsTo

@@ -69,16 +69,25 @@ class UserController extends Controller
             'role' => 'sometimes|in:admin,agent,merchant',
             'merchant_ids' => 'nullable|array',
             'merchant_ids.*' => 'integer|exists:merchants,id',
+            'order_limit' => 'nullable|numeric|min:0',
         ], [
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number.',
         ]);
 
         $role = $validated['role'] ?? 'merchant';
-        unset($validated['password_confirmation'], $validated['role']);
+        $orderLimit = isset($validated['order_limit']) ? (float) $validated['order_limit'] : null;
+        unset($validated['password_confirmation'], $validated['role'], $validated['order_limit']);
         $validated['password'] = bcrypt($validated['password']);
         $validated['role'] = $role;
 
         $user = User::create($validated);
+
+        if ($orderLimit !== null) {
+            $user->order_limit = $orderLimit;
+            $user->save();
+        }
+
+        $user->refreshOrderFinancials();
 
         return response()->json([
             'message' => 'User created successfully',
@@ -127,6 +136,7 @@ class UserController extends Controller
             'role' => 'sometimes|in:admin,agent,merchant',
             'merchant_ids' => 'nullable|array',
             'merchant_ids.*' => 'integer|exists:merchants,id',
+            'order_limit' => 'nullable|numeric|min:0',
         ], [
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number.',
         ]);
@@ -137,7 +147,9 @@ class UserController extends Controller
         unset($validated['password_confirmation']);
 
         $merchantIds = $validated['merchant_ids'] ?? null;
-        $updateData = Arr::except($validated, ['merchant_ids']);
+        $orderLimitProvided = array_key_exists('order_limit', $validated);
+        $orderLimit = $orderLimitProvided ? (float) $validated['order_limit'] : null;
+        $updateData = Arr::except($validated, ['merchant_ids', 'order_limit']);
 
         if (
             isset($updateData['role']) &&
@@ -149,6 +161,11 @@ class UserController extends Controller
         }
 
         $user->update($updateData);
+
+        if ($orderLimitProvided) {
+            $user->order_limit = $orderLimit ?? 0;
+            $user->save();
+        }
 
         $finalRole = $user->role;
 
@@ -168,6 +185,10 @@ class UserController extends Controller
             }
         } else {
             Merchant::where('agent_id', $user->id)->update(['agent_id' => null]);
+        }
+
+        if ($orderLimitProvided) {
+            $user->refreshOrderFinancials();
         }
 
         return response()->json([

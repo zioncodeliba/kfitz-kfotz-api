@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Arr;
 
 class MerchantController extends Controller
 {
@@ -68,6 +69,15 @@ class MerchantController extends Controller
 
         $merchants = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
+        $merchants->getCollection()->transform(function (Merchant $merchant) {
+            if ($merchant->relationLoaded('user') && $merchant->user) {
+                $merchant->setAttribute('credit_limit', $merchant->user->order_limit);
+                $merchant->setAttribute('balance', $merchant->user->order_balance);
+            }
+
+            return $merchant;
+        });
+
         return $this->successResponse($merchants);
     }
 
@@ -99,7 +109,7 @@ class MerchantController extends Controller
             'address.phone' => 'required|string',
             'commission_rate' => 'numeric|min:0|max:100',
             'monthly_fee' => 'numeric|min:0',
-            'credit_limit' => 'numeric|min:0',
+            'order_limit' => 'nullable|numeric|min:0',
             'plugin_sites' => 'nullable|array',
             'plugin_sites.*.site_url' => 'required|string|max:255',
             'plugin_sites.*.name' => 'nullable|string|max:255',
@@ -129,6 +139,8 @@ class MerchantController extends Controller
             }
         }
 
+        $orderLimit = Arr::pull($data, 'order_limit', null);
+
         $pluginSites = collect($data['plugin_sites'] ?? [])
             ->map(function (array $site) {
                 return [
@@ -152,6 +164,15 @@ class MerchantController extends Controller
 
         $merchant = Merchant::create($data);
 
+        if ($orderLimit !== null) {
+            $merchantUser->order_limit = (float) $orderLimit;
+            $merchantUser->save();
+        }
+
+        $merchantUser->refreshOrderFinancials();
+
+        $merchant->refresh();
+
         if ($pluginSites->isNotEmpty()) {
             $merchant->pluginSites()->createMany(
                 $pluginSites
@@ -162,6 +183,9 @@ class MerchantController extends Controller
                     ->all()
             );
         }
+
+        $merchant->setAttribute('credit_limit', $merchant->user?->order_limit);
+        $merchant->setAttribute('balance', $merchant->user?->order_balance);
 
         return $this->createdResponse(
             $merchant->load(['user', 'agent', 'pluginSites']),
@@ -195,6 +219,9 @@ class MerchantController extends Controller
         $merchant->previous_month_orders = $merchant->getPreviousMonthOrders();
         $merchant->outstanding_balance = $merchant->getOutstandingBalance();
 
+        $merchant->setAttribute('credit_limit', $merchant->user?->order_limit);
+        $merchant->setAttribute('balance', $merchant->user?->order_balance);
+
         return $this->successResponse($merchant);
     }
 
@@ -222,7 +249,7 @@ class MerchantController extends Controller
             'verification_status' => 'sometimes|in:pending,verified,rejected',
             'commission_rate' => 'numeric|min:0|max:100',
             'monthly_fee' => 'numeric|min:0',
-            'credit_limit' => 'numeric|min:0',
+            'order_limit' => 'nullable|numeric|min:0',
             'payment_methods' => 'nullable|array',
             'shipping_settings' => 'nullable|array',
             'banner_settings' => 'nullable|array',
@@ -251,6 +278,8 @@ class MerchantController extends Controller
             }
         }
 
+        $orderLimit = Arr::pull($data, 'order_limit', null);
+
         $pluginSites = null;
         if (array_key_exists('plugin_sites', $data)) {
             $pluginSites = collect($data['plugin_sites'] ?? [])
@@ -276,6 +305,13 @@ class MerchantController extends Controller
 
         $merchant->update($data);
 
+        if ($orderLimit !== null && $merchant->user) {
+            $merchant->user->forceFill([
+                'order_limit' => (float) $orderLimit,
+            ])->save();
+            $merchant->user->refreshOrderFinancials();
+        }
+
         // Update verification timestamp if status changed to verified
         if (
             array_key_exists('verification_status', $data) &&
@@ -298,6 +334,9 @@ class MerchantController extends Controller
                 );
             }
         }
+
+        $merchant->setAttribute('credit_limit', $merchant->user?->order_limit);
+        $merchant->setAttribute('balance', $merchant->user?->order_balance);
 
         return $this->successResponse(
             $merchant->load(['user', 'agent', 'pluginSites']),
