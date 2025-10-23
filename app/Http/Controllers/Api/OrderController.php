@@ -84,7 +84,7 @@ class OrderController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer']);
+        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer', 'merchantSite']);
 
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
         $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
@@ -124,7 +124,7 @@ class OrderController extends Controller
     public function openOrders(Request $request)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer'])
+        $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer', 'merchantSite'])
             ->whereIn('status', ['pending', 'confirmed', 'processing']);
 
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
@@ -140,6 +140,28 @@ class OrderController extends Controller
 
         if ($request->has('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $merchantSiteFilter = $request->query('merchant_site_id');
+
+        if ($merchantSiteFilter !== null && $merchantSiteFilter !== '') {
+            if (is_array($merchantSiteFilter)) {
+                $siteIds = array_map(static function ($value) {
+                    return is_numeric($value) ? (int) $value : null;
+                }, $merchantSiteFilter);
+
+                $siteIds = array_filter($siteIds, static function ($value) {
+                    return $value !== null;
+                });
+
+                if (!empty($siteIds)) {
+                    $query->whereIn('merchant_site_id', $siteIds);
+                }
+            } elseif (is_string($merchantSiteFilter) && strtolower($merchantSiteFilter) === 'null') {
+                $query->whereNull('merchant_site_id');
+            } else {
+                $query->where('merchant_site_id', (int) $merchantSiteFilter);
+            }
         }
 
         if ($request->has('search')) {
@@ -373,7 +395,7 @@ class OrderController extends Controller
     public function show(Request $request, string $id)
     {
         $user = $request->user();
-        $order = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer'])->findOrFail($id);
+        $order = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer', 'merchantSite'])->findOrFail($id);
 
         // Check permissions
         if ($user->hasRole('admin')) {
@@ -481,7 +503,7 @@ class OrderController extends Controller
     public function byStatus(Request $request, $status)
     {
         $user = $request->user();
-        $query = Order::with(['items.product', 'user', 'merchantCustomer']);
+        $query = Order::with(['items.product', 'user', 'merchantCustomer', 'merchantSite']);
 
         // Apply role-based filtering
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
@@ -816,6 +838,7 @@ class OrderController extends Controller
                 'order.user',
                 'order.merchant',
                 'order.merchantCustomer',
+                'order.merchantSite',
                 'carrier',
             ])
             ->whereIn('status', Shipment::ACTIVE_STATUSES)
@@ -874,6 +897,7 @@ class OrderController extends Controller
                 'order.user',
                 'order.merchant',
                 'order.merchantCustomer',
+                'order.merchantSite',
                 'carrier',
             ])
             ->whereIn('status', Shipment::FINAL_STATUSES)
@@ -928,7 +952,7 @@ class OrderController extends Controller
      */
     public function getShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer', 'merchantSite'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {
@@ -971,7 +995,7 @@ class OrderController extends Controller
      */
     public function updateShippingSettings(Request $request, string $id)
     {
-        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer'])->findOrFail($id);
+        $order = Order::with(['items', 'carrier', 'user', 'merchant', 'shipment', 'merchantCustomer', 'merchantSite'])->findOrFail($id);
         $user = $request->user();
 
         if (!$this->canManageOrderShipping($user, $order)) {

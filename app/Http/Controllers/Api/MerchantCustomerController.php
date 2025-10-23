@@ -218,6 +218,16 @@ class MerchantCustomerController extends Controller
 
     protected function extractPluginSiteInfo(Order $order): ?array
     {
+        $site = $order->merchantSite;
+        if ($site) {
+            return [
+                'id' => $site->id,
+                'name' => $site->name,
+                'site_url' => $site->site_url,
+                'platform' => $site->platform,
+            ];
+        }
+
         $metadata = $order->source_metadata;
         if (!is_array($metadata) || empty($metadata)) {
             return null;

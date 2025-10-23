@@ -159,6 +159,7 @@ class PluginOrderController extends Controller
                 'user_id' => $merchantUser->id,
                 'merchant_id' => $merchantUser->id,
                 'merchant_customer_id' => $merchantCustomer->id,
+                'merchant_site_id' => $site->id,
                 'status' => Order::STATUS_PENDING,
                 'payment_status' => 'pending',
                 'source' => 'plugin',

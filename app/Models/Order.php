@@ -21,6 +21,7 @@ class Order extends Model
         'user_id',
         'merchant_id',
         'merchant_customer_id',
+        'merchant_site_id',
         'agent_id',
         'source',
         'source_reference',
@@ -72,6 +73,11 @@ class Order extends Model
     public function merchantCustomer(): BelongsTo
     {
         return $this->belongsTo(MerchantCustomer::class);
+    }
+
+    public function merchantSite(): BelongsTo
+    {
+        return $this->belongsTo(MerchantSite::class);
     }
 
     public function agent(): BelongsTo
