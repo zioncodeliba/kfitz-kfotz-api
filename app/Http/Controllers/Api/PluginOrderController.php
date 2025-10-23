@@ -216,6 +216,8 @@ class PluginOrderController extends Controller
 
             DB::commit();
 
+            $merchantUser->refreshOrderFinancials();
+
             return $this->createdResponse(
                 $order->load(['items', 'merchant', 'user']),
                 'Order created from plugin successfully'

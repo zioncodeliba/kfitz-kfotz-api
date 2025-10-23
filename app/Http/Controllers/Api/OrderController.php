@@ -199,6 +199,7 @@ class OrderController extends Controller
 
             $user = $request->user();
             $merchantId = null;
+            $merchantUser = null;
 
             if ($user->hasRole('merchant')) {
                 $merchantId = (int) $user->id;
@@ -339,6 +340,10 @@ class OrderController extends Controller
             }
 
             DB::commit();
+
+            if ($merchantUser) {
+                $merchantUser->refreshOrderFinancials();
+            }
 
             return $this->createdResponse($order->load(['items.product', 'user']), 'Order created successfully');
 
