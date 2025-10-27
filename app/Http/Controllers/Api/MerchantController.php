@@ -11,6 +11,7 @@ use App\Services\ShippingSettingsService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 class MerchantController extends Controller
 {
@@ -378,11 +379,16 @@ class MerchantController extends Controller
             return $this->errorResponse('Merchant profile not found', 404);
         }
 
-        $currentMonthOutstanding = $merchant->orders()
-            ->whereIn('status', ['pending', 'processing', 'shipped'])
+        $currentMonthUnpaidQuery = $merchant->orders()
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
-            ->sum('total');
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhere('payment_status', '!=', 'paid');
+            });
+
+        $currentMonthOutstanding = (clone $currentMonthUnpaidQuery)->sum('total');
+        $currentMonthUnpaidCount = $currentMonthUnpaidQuery->count();
 
         $lowStockCount = Product::lowStock()->count();
         $availableProductsCount = Product::inStock()->count();
@@ -393,7 +399,8 @@ class MerchantController extends Controller
             'previous_month_revenue' => $merchant->getPreviousMonthRevenue(),
             'previous_month_orders' => $merchant->getPreviousMonthOrders(),
             'outstanding_balance' => $merchant->getOutstandingBalance(),
-            'current_month_outstanding' => $currentMonthOutstanding,
+            'current_month_outstanding' => round($currentMonthOutstanding, 2),
+            'current_month_unpaid_total' => round($currentMonthOutstanding, 2),
             'total_orders' => $merchant->orders()->count(),
             'pending_orders' => $merchant->orders()->where('status', 'pending')->count(),
             'processing_orders' => $merchant->orders()->where('status', 'processing')->count(),
@@ -403,6 +410,39 @@ class MerchantController extends Controller
             'credit_limit' => $merchant->credit_limit,
             'low_stock_products' => $lowStockCount,
             'available_products' => $availableProductsCount,
+            'current_month_unpaid_orders' => $currentMonthUnpaidCount,
+        ];
+
+        $startOfCurrentMonth = Carbon::now()->startOfMonth();
+        $historicalOrdersQuery = $merchant->orders()->where('created_at', '<', $startOfCurrentMonth);
+
+        $historicalPaidQuery = (clone $historicalOrdersQuery)->where('payment_status', 'paid');
+        $historicalPaidTotal = (clone $historicalPaidQuery)->sum('total');
+        $historicalPaidCount = $historicalPaidQuery->count();
+
+        $historicalUnpaidQuery = (clone $historicalOrdersQuery)->where('payment_status', '!=', 'paid');
+        $historicalUnpaidTotal = (clone $historicalUnpaidQuery)->sum('total');
+        $historicalUnpaidCount = $historicalUnpaidQuery->count();
+
+        $outstandingOrdersQuery = $merchant->orders()->where('payment_status', 'pending');
+        $outstandingOrdersCount = $outstandingOrdersQuery->count();
+
+        $paidOrdersQuery = $merchant->orders()->where('payment_status', 'paid');
+        $paidOrdersTotal = (clone $paidOrdersQuery)->sum('total');
+        $paidOrdersCount = $paidOrdersQuery->count();
+
+        $stats['historical_orders_summary'] = [
+            'paid_total' => round($historicalPaidTotal, 2),
+            'paid_count' => $historicalPaidCount,
+            'unpaid_total' => round($historicalUnpaidTotal, 2),
+            'unpaid_count' => $historicalUnpaidCount,
+        ];
+
+        $stats['payment_overview'] = [
+            'outstanding_total' => round($stats['outstanding_balance'], 2),
+            'outstanding_count' => $outstandingOrdersCount,
+            'paid_total' => round($paidOrdersTotal, 2),
+            'paid_count' => $paidOrdersCount,
         ];
 
         return $this->successResponse($stats);

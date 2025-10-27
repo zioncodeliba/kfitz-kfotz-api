@@ -192,7 +192,17 @@ class OrderController extends Controller
             'source_metadata' => 'nullable|array',
             'shipping_cost' => 'nullable|numeric|min:0',
             'merchant_id' => 'nullable|exists:users,id',
+            'carrier_id' => 'nullable|exists:shipping_carriers,id',
+            'carrier_service_type' => 'nullable|string|max:100',
         ]);
+
+        $selectedCarrier = null;
+        if (!empty($data['carrier_id'])) {
+            $selectedCarrier = ShippingCarrier::findOrFail($data['carrier_id']);
+            if (!$selectedCarrier->isActive()) {
+                return $this->errorResponse('Selected carrier is not active', 422);
+            }
+        }
 
         try {
             DB::beginTransaction();
@@ -314,6 +324,11 @@ class OrderController extends Controller
                 'shipping_type' => $data['shipping_type'],
                 'shipping_method' => $data['shipping_method'],
             ]);
+
+            if ($selectedCarrier) {
+                $serviceType = $data['carrier_service_type'] ?? $data['shipping_method'] ?? 'regular';
+                $order->assignCarrier($selectedCarrier, $serviceType);
+            }
 
             // Create order items and update stock
             foreach ($items as $item) {
@@ -1038,6 +1053,10 @@ class OrderController extends Controller
             'cod_method' => 'nullable|string|max:191',
             'shipment_notes' => 'nullable|string',
         ]);
+        $previousShippingCost = (float) ($order->shipping_cost ?? 0);
+        $requestedShippingCost = array_key_exists('shipping_cost', $validated) && $validated['shipping_cost'] !== null
+            ? (float) $validated['shipping_cost']
+            : null;
 
         $merchant = Merchant::where('user_id', $order->merchant_id)->first();
 
@@ -1091,12 +1110,14 @@ class OrderController extends Controller
 
             $order->assignCarrier($carrier, $serviceType);
 
-            $shippingCost = $order->fresh(['items', 'carrier'])->calculateShippingCost();
+            $order = $order->fresh(['items', 'carrier']);
+            $shippingCost = $order->calculateShippingCost();
 
-            $order->update([
-                'shipping_cost' => $shippingCost,
-                'total' => $order->subtotal + $order->tax + $shippingCost - $order->discount,
-            ]);
+            if ($shippingCost <= 0) {
+                $shippingCost = $requestedShippingCost ?? $previousShippingCost;
+            }
+
+            $this->recalculateOrderTotals($order, $shippingCost);
         }
 
         $shipment = null;
@@ -1114,6 +1135,12 @@ class OrderController extends Controller
             );
             $order = $order->fresh(['items', 'carrier', 'user', 'merchant']);
         }
+
+        $order = $order->fresh(['items', 'carrier', 'user', 'merchant']);
+        $merchant?->refresh();
+
+        $finalShippingCost = $requestedShippingCost ?? (float) ($order->shipping_cost ?? $previousShippingCost);
+        $this->recalculateOrderTotals($order, $finalShippingCost);
 
         $order->refresh();
         $merchant?->refresh();
@@ -1143,6 +1170,22 @@ class OrderController extends Controller
             'settings' => $payload['settings'],
             'options' => $payload['options'],
         ], 'Order shipping settings updated successfully');
+    }
+
+    protected function recalculateOrderTotals(Order $order, ?float $shippingCostOverride = null): void
+    {
+        $shippingCost = $shippingCostOverride !== null
+            ? (float) $shippingCostOverride
+            : (float) ($order->shipping_cost ?? 0);
+
+        $subtotal = (float) ($order->subtotal ?? 0);
+        $tax = (float) ($order->tax ?? 0);
+        $discount = (float) ($order->discount ?? 0);
+
+        $order->update([
+            'shipping_cost' => $shippingCost,
+            'total' => $subtotal + $tax + $shippingCost - $discount,
+        ]);
     }
 
     protected function dispatchShipmentForOrder(

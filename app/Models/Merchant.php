@@ -84,7 +84,7 @@ class Merchant extends Model
 
     public function orders(): HasMany
     {
-        return $this->hasMany(Order::class, 'merchant_id', 'user_id');
+        return $this->hasMany(Order::class, 'merchant_id', 'id');
     }
 
     public function pluginSites(): HasMany
