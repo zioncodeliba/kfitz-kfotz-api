@@ -57,6 +57,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
         return response()->json(['message' => 'Welcome, admin']);
     });
     Route::get('/admin/dashboard/alerts', [SystemAlertController::class, 'index']);
+    Route::get('/admin/orders/summary', [OrderController::class, 'adminSummary']);
     
     // User management
     Route::get('/users', [UserController::class, 'index']);

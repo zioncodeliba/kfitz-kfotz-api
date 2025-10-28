@@ -462,7 +462,7 @@ class OrderController extends Controller
 
         $request->validate([
             'status' => 'sometimes|in:pending,confirmed,processing,shipped,delivered,cancelled,refunded',
-            'payment_status' => 'sometimes|in:pending,paid,failed,refunded',
+            'payment_status' => 'sometimes|in:pending,paid,failed,refunded,cancelled,canceled',
             'tracking_number' => 'nullable|string',
             'shipping_company' => 'nullable|string',
             'notes' => 'nullable|string',
@@ -485,6 +485,22 @@ class OrderController extends Controller
             $updates['source_metadata'] = $request->input('source_metadata');
         }
 
+        if (array_key_exists('status', $updates) && is_string($updates['status'])) {
+            $normalizedStatus = strtolower($updates['status']);
+            if ($normalizedStatus === 'canceled') {
+                $normalizedStatus = 'cancelled';
+            }
+            $updates['status'] = $normalizedStatus;
+        }
+
+        if (array_key_exists('payment_status', $updates) && is_string($updates['payment_status'])) {
+            $normalizedPaymentStatus = strtolower($updates['payment_status']);
+            if ($normalizedPaymentStatus === 'canceled') {
+                $normalizedPaymentStatus = 'cancelled';
+            }
+            $updates['payment_status'] = $normalizedPaymentStatus;
+        }
+
         $order->update($updates);
 
         // Update timestamps based on status
@@ -502,7 +518,7 @@ class OrderController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
         $order = Order::findOrFail($id);
         $user = $request->user();
@@ -617,6 +633,69 @@ class OrderController extends Controller
             'trends' => $trends,
             'period' => $periodMeta,
         ]));
+    }
+
+    public function adminSummary(Request $request)
+    {
+        $user = $request->user();
+        if (!$user->hasRole('admin')) {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+
+        $pendingOrders = Order::where('status', 'pending')->count();
+        $processingOrders = Order::where('status', 'processing')->count();
+        $shippedOrders = Order::where('status', 'shipped')->count();
+        $deliveredOrders = Order::where('status', 'delivered')->count();
+
+        $outstandingQuery = Order::query()
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhere('payment_status', '!=', 'paid');
+            })
+            ->whereNotIn('status', ['cancelled', 'canceled']);
+        $outstandingTotal = (float) (clone $outstandingQuery)->sum('total');
+        $outstandingCount = (clone $outstandingQuery)->count();
+
+        $paidOrdersQuery = Order::where('payment_status', 'paid');
+        $paidOrdersTotal = (float) (clone $paidOrdersQuery)->sum('total');
+        $paidOrdersCount = (clone $paidOrdersQuery)->count();
+
+        $startOfCurrentMonth = Carbon::now()->startOfMonth();
+        $historicalPaidQuery = Order::query()
+            ->where('created_at', '<', $startOfCurrentMonth)
+            ->where('payment_status', 'paid');
+        $historicalPaidTotal = (float) (clone $historicalPaidQuery)->sum('total');
+        $historicalPaidCount = (clone $historicalPaidQuery)->count();
+
+        $historicalUnpaidQuery = Order::query()
+            ->where('created_at', '<', $startOfCurrentMonth)
+            ->where(function ($query) {
+                $query->whereNull('payment_status')
+                    ->orWhere('payment_status', '!=', 'paid');
+            })
+            ->whereNotIn('status', ['cancelled', 'canceled']);
+        $historicalUnpaidTotal = (float) (clone $historicalUnpaidQuery)->sum('total');
+        $historicalUnpaidCount = (clone $historicalUnpaidQuery)->count();
+
+        return $this->successResponse([
+            'pending_orders' => $pendingOrders,
+            'processing_orders' => $processingOrders,
+            'shipped_orders' => $shippedOrders,
+            'delivered_orders' => $deliveredOrders,
+            'outstanding_balance' => round($outstandingTotal, 2),
+            'historical_orders_summary' => [
+                'paid_total' => round($historicalPaidTotal, 2),
+                'paid_count' => $historicalPaidCount,
+                'unpaid_total' => round($historicalUnpaidTotal, 2),
+                'unpaid_count' => $historicalUnpaidCount,
+            ],
+            'payment_overview' => [
+                'outstanding_total' => round($outstandingTotal, 2),
+                'outstanding_count' => $outstandingCount,
+                'paid_total' => round($paidOrdersTotal, 2),
+                'paid_count' => $paidOrdersCount,
+            ],
+        ]);
     }
 
     /**
