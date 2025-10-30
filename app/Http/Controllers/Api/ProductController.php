@@ -7,6 +7,7 @@ use App\Traits\ApiResponse;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\Merchant;
+use App\Models\MerchantSite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
@@ -90,11 +91,22 @@ class ProductController extends Controller
             'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
             'merchant_prices.*.price' => 'required|numeric|min:0',
             'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
+            'plugin_site_prices' => 'nullable|array',
+            'plugin_site_prices.*.site_id' => 'required|integer|exists:merchant_sites,id',
+            'plugin_site_prices.*.price' => 'required|numeric|min:0',
+            'plugin_site_prices.*.site_name' => 'nullable|string|max:255',
+            'plugin_site_prices.*.is_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->has('merchant_prices')) {
             $validated['merchant_prices'] = $this->normalizeMerchantPrices(
                 $request->input('merchant_prices', [])
+            );
+        }
+
+        if ($request->has('plugin_site_prices')) {
+            $validated['plugin_site_prices'] = $this->normalizePluginSitePrices(
+                $request->input('plugin_site_prices', [])
             );
         }
 
@@ -139,11 +151,22 @@ class ProductController extends Controller
             'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
             'merchant_prices.*.price' => 'required|numeric|min:0',
             'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
+            'plugin_site_prices' => 'nullable|array',
+            'plugin_site_prices.*.site_id' => 'required|integer|exists:merchant_sites,id',
+            'plugin_site_prices.*.price' => 'required|numeric|min:0',
+            'plugin_site_prices.*.site_name' => 'nullable|string|max:255',
+            'plugin_site_prices.*.is_enabled' => 'nullable|boolean',
         ]);
 
         if ($request->has('merchant_prices')) {
             $validated['merchant_prices'] = $this->normalizeMerchantPrices(
                 $request->input('merchant_prices', [])
+            );
+        }
+
+        if ($request->has('plugin_site_prices')) {
+            $validated['plugin_site_prices'] = $this->normalizePluginSitePrices(
+                $request->input('plugin_site_prices', [])
             );
         }
 
@@ -234,6 +257,104 @@ class ProductController extends Controller
         }
 
         return array_values($normalized);
+    }
+
+    protected function normalizePluginSitePrices(array $rawPrices): array
+    {
+        if (empty($rawPrices)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($rawPrices as $row) {
+            if (is_object($row)) {
+                $row = (array) $row;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            $rows[] = $row;
+        }
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $siteIds = [];
+        foreach ($rows as $row) {
+            if (!isset($row['site_id'])) {
+                continue;
+            }
+            $siteId = (int) $row['site_id'];
+            if ($siteId > 0) {
+                $siteIds[] = $siteId;
+            }
+        }
+
+        $siteIds = array_values(array_unique($siteIds));
+
+        $namesBySiteId = [];
+        if (!empty($siteIds)) {
+            $namesBySiteId = MerchantSite::whereIn('id', $siteIds)
+                ->get(['id', 'name', 'site_url'])
+                ->mapWithKeys(function (MerchantSite $site) {
+                    $labelParts = [];
+                    if ($site->name) {
+                        $labelParts[] = trim($site->name);
+                    }
+                    if ($site->site_url) {
+                        $labelParts[] = trim($site->site_url);
+                    }
+                    $label = implode(' · ', array_filter($labelParts));
+                    return [$site->id => ($label !== '' ? $label : null)];
+                })
+                ->toArray();
+        }
+
+        $normalized = [];
+        $seen = [];
+
+        foreach ($rows as $row) {
+            if (!isset($row['site_id'], $row['price'])) {
+                continue;
+            }
+
+            $siteId = (int) $row['site_id'];
+            if ($siteId <= 0 || isset($seen[$siteId])) {
+                continue;
+            }
+
+            $priceValue = $row['price'];
+            if (is_string($priceValue)) {
+                $priceValue = (float) str_replace(',', '', $priceValue);
+            }
+            $price = is_numeric($priceValue) ? (float) $priceValue : null;
+            if ($price === null || $price < 0) {
+                continue;
+            }
+
+            $isEnabled = array_key_exists('is_enabled', $row)
+                ? filter_var($row['is_enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                : true;
+
+            $siteNameCandidate = isset($row['site_name']) ? trim((string) $row['site_name']) : '';
+            $siteName = $siteNameCandidate !== ''
+                ? $siteNameCandidate
+                : ($namesBySiteId[$siteId] ?? null);
+
+            $normalized[] = array_filter([
+                'site_id' => $siteId,
+                'price' => round($price, 2),
+                'is_enabled' => $isEnabled !== false,
+                'site_name' => $siteName,
+            ], static function ($value) {
+                return $value !== null;
+            });
+
+            $seen[$siteId] = true;
+        }
+
+        return $normalized;
     }
 
     /**

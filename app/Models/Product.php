@@ -23,6 +23,7 @@ class Product extends Model
         'weight',
         'dimensions',
         'merchant_prices',
+        'plugin_site_prices',
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class Product extends Model
         'images' => 'array',
         'variations' => 'array',
         'merchant_prices' => 'array',
+        'plugin_site_prices' => 'array',
     ];
 
     // Category relationship
