@@ -1,1914 +1,2574 @@
 {
-	"info": {
-		"_postman_id": "kfitz-api-collection",
-		"name": "KFitz API Collection",
-		"description": "Complete API collection for KFitz Backend - Authentication, User Management, Role Management, and Email Verification",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "Authentication",
-			"item": [
-				{
-					"name": "Register",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"test@example.com\",\n    \"password\": \"Password123\",\n    \"password_confirmation\": \"Password123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/register",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"register"
-							]
-						}
-					}
-				},
-				{
-					"name": "Login",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"password123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/login",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"login"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Current User",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/me",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"me"
-							]
-						}
-					}
-				},
-				{
-					"name": "Logout",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/logout",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"logout"
-							]
-						}
-					}
-				},
-				{
-					"name": "Forgot Password",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"email\": \"admin@example.com\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/forgot-password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"forgot-password"
-							]
-						}
-					}
-				},
-				{
-					"name": "Reset Password",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"token\": \"reset_token_here\",\n    \"email\": \"admin@example.com\",\n    \"password\": \"NewPassword123\",\n    \"password_confirmation\": \"NewPassword123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/reset-password",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"reset-password"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Email Verification",
-			"item": [
-				{
-					"name": "Get Verification Status",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/email/verification-status",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"email",
-								"verification-status"
-							]
-						}
-					}
-				},
-				{
-					"name": "Resend Verification Email",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/email/verification-notification",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"email",
-								"verification-notification"
-							]
-						}
-					}
-				},
-				{
-					"name": "Verify Email (Public)",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/email/verify/1/verification_hash_here",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"email",
-								"verify",
-								"1",
-								"verification_hash_here"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Admin Dashboard",
-			"item": [
-				{
-					"name": "Admin Dashboard",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/admin/dashboard",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"admin",
-								"dashboard"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "User Management (Admin Only)",
-			"item": [
-				{
-					"name": "List Customers",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Loads only non-merchant customers. Supports optional query params: `search` (matches name/email/phone), `roles` (comma list, default `*` for all non-merchant roles), `per_page`, `sort` (`name`, `email`, `created_at`, `orders_count`), and `direction` (`asc`|`desc`).",
-						"url": {
-							"raw": "{{base_url}}/api/users?search=john&per_page=10&sort=created_at&direction=desc",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users"
-							],
-							"query": [
-								{
-									"key": "search",
-									"value": "john"
-								},
-								{
-									"key": "roles",
-									"value": "user"
-								},
-								{
-									"key": "per_page",
-									"value": "10"
-								},
-								{
-									"key": "sort",
-									"value": "created_at"
-								},
-								{
-									"key": "direction",
-									"value": "desc"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Create User",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"New User\",\n    \"email\": \"newuser@example.com\",\n    \"phone\": \"+972501234567\",\n    \"password\": \"Password123\",\n    \"password_confirmation\": \"Password123\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Customer Details",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Return a single customer (non-merchant) including their orders, items, and product refs.",
-						"url": {
-							"raw": "{{base_url}}/api/users/{{customer_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"{{customer_id}}"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update User",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated User Name\",\n    \"email\": \"updated@example.com\",\n    \"phone\": \"+972509876543\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete User",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/users/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Assign Role to User",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"role\": \"seller\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/1/assign-role",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"1",
-								"assign-role"
-							]
-						}
-					}
-				},
-				{
-					"name": "Remove Role from User",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"role\": \"seller\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/users/1/remove-role",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"users",
-								"1",
-								"remove-role"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Merchant Management (Admin Only)",
-			"item": [
-				{
-					"name": "List Merchants",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Returns merchants with business info, contact details, status, and account stats. Supports optional query params: `search` (business name/phone/id), `status` (`active`,`pending`,`suspended`), `verification_status` (`pending`,`verified`,`rejected`), and `per_page`.",
-						"url": {
-							"raw": "{{base_url}}/api/merchants?search=store&status=active&verification_status=verified&per_page=10",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchants"
-							],
-							"query": [
-								{"key": "search", "value": "store"},
-								{"key": "status", "value": "active"},
-								{"key": "verification_status", "value": "verified"},
-								{"key": "per_page", "value": "10"}
-							]
-						}
-					}
-				},
-				{
-					"name": "Create Merchant",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"user_id\": 5,\n    \"business_name\": \"סטודיו לדיגיטל בע\"\"ם\",\n    \"business_id\": \"515123456\",\n    \"phone\": \"03-5556677\",\n    \"website\": \"https://studio.example\",\n    \"description\": \"סוכנות דיגיטל ושיווק\",\n    \"address\": {\n        \"name\": \"סטודיו דיגיטל\",\n        \"address\": \"אבן גבירול 10\",\n        \"city\": \"תל אביב\",\n        \"zip\": \"6400000\",\n        \"phone\": \"03-5556677\"\n    },\n    \"commission_rate\": 12,\n    \"monthly_fee\": 250,\n    \"credit_limit\": 10000\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/merchants",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchants"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Merchant Details",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Returns a merchant including user contact, current stats (monthly revenue/orders, previous month comparison, balance), and related orders.",
-						"url": {
-							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchants",
-								"{{merchant_id}}"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Merchant",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"business_name\": \"אוברלייט טכנולוגיות\",\n    \"status\": \"active\",\n    \"verification_status\": \"verified\",\n    \"commission_rate\": 9.5,\n    \"monthly_fee\": 300,\n    \"credit_limit\": 12000,\n    \"address\": {\n        \"name\": \"סניף ראשי\",\n        \"address\": \"החרושת 5\",\n        \"city\": \"ראשון לציון\",\n        \"zip\": \"7530000\",\n        \"phone\": \"03-7778899\"\n    }\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchants",
-								"{{merchant_id}}"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete Merchant",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/merchants/{{merchant_id}}",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchants",
-								"{{merchant_id}}"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Merchant Portal",
-			"item": [
-				{
-					"name": "Get Shipping Settings",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Returns the merchant shipping configuration for the selected merchant (admin only). Provide `merchant_id` as a query param to target the merchant record.",
-						"url": {
-							"raw": "{{base_url}}/api/merchant/shipping-settings",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchant",
-								"shipping-settings"
-							],
-							"query": [
-								{
-									"key": "merchant_id",
-									"value": "{{merchant_id}}"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Shipping Settings",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"description": "Creates or updates the merchant shipping preferences (admin only). Include `merchant_id` in the payload alongside one or more `shipping_units` entries.",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"merchant_id\": {{merchant_id}},\n    \"default_destination\": \"local\",\n    \"default_service_type\": \"regular\",\n    \"default_package_type\": \"box\",\n    \"shipping_units\": [\n        {\n            \"destination\": \"local\",\n            \"service_type\": \"regular\",\n            \"carrier_code\": \"israelpost\",\n            \"package_type\": \"box\",\n            \"quantity\": 1,\n            \"price\": 19.9,\n            \"notes\": \"שליח עד הבית בתוך 2 ימי עסקים\"\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/merchant/shipping-settings",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"merchant",
-								"shipping-settings"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Role Management (Admin Only)",
-			"item": [
-				{
-					"name": "Get All Roles",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/roles",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles"
-							]
-						}
-					}
-				},
-				{
-					"name": "Create Role",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"moderator\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/roles",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Role",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/roles/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Role",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"super_moderator\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/roles/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete Role",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/roles/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"roles",
-								"1"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Order Management",
-			"item": [
-				{
-					"name": "List Orders",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders"
-							]
-						}
-					}
-				},
-				{
-					"name": "Open Orders",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Returns orders whose status is `pending`, `confirmed`, or `processing`. Supports `payment_status`, `date_from`, `date_to`, `search`, and `per_page` query params.",
-						"url": {
-							"raw": "{{base_url}}/api/orders/open",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"open"
-							],
-							"query": [
-								{
-									"key": "payment_status",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "date_from",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "date_to",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "search",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "per_page",
-									"value": "",
-									"disabled": true
-								}
-							]
-						}
-					}
-				},
-			{
-				"name": "Create Order",
-				"request": {
-					"method": "POST",
-					"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"quantity\": 2\n        },\n        {\n            \"product_id\": 3,\n            \"quantity\": 1\n        }\n    ],\n    \"shipping_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"billing_address\": {\n        \"street\": \"123 Main St\",\n        \"city\": \"Tel Aviv\",\n        \"postal_code\": \"123456\",\n        \"country\": \"Israel\"\n    },\n    \"shipping_type\": \"delivery\",\n    \"shipping_method\": \"regular\",\n    \"cod_payment\": false,\n    \"notes\": \"Please deliver in the morning\",\n    \"source\": \"online_store\",\n    \"source_reference\": \"WEB-NEW-2025\",\n    \"source_metadata\": {\n        \"campaign\": \"spring_launch\",\n        \"utm_source\": \"facebook\"\n    }\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders"
-							]
-						}
-				}
-			},
-			{
-				"name": "Create Plugin Order",
-				"request": {
-					"method": "POST",
-					"header": [
-						{
-							"key": "Authorization",
-							"value": "Bearer {{merchant_token}}"
-						},
-						{
-							"key": "Content-Type",
-							"value": "application/json"
-						}
-					],
-					"body": {
-						"mode": "raw",
-						"raw": "{\n    \"site_url\": \"https://demo-store.example.com\",\n    \"external_id\": \"PLUGIN-ORDER-123\",\n    \"customer\": {\n        \"name\": \"לקוח פלאגין\",\n        \"phone\": \"050-1234567\",\n        \"email\": \"customer@example.com\",\n        \"address\": {\n            \"line1\": \"רחוב הדגמה 10\",\n            \"city\": \"תל אביב\",\n            \"zip\": \"6100000\",\n            \"country\": \"ישראל\"\n        }\n    },\n    \"items\": [\n        {\n            \"product_id\": 1,\n            \"sku\": \"SKU-123\",\n            \"quantity\": 2\n        }\n    ],\n    \"notes\": \"נוצר אוטומטית מהפלאגין\"\n}"
-					},
-					"url": {
-						"raw": "{{base_url}}/api/plugin/orders",
-						"host": [
-							"{{base_url}}"
-						],
-						"path": [
-							"api",
-							"plugin",
-							"orders"
-						]
-					}
-				}
-			},
-			{
-				"name": "Get Order",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Order",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"status\": \"processing\",\n    \"payment_status\": \"paid\",\n    \"tracking_number\": \"TRACK123456\",\n    \"shipping_company\": \"FedEx\",\n    \"notes\": \"Customer confirmed details\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete Order",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Orders By Status",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/status/pending",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"status",
-								"pending"
-							]
-						}
-					}
-				},
-				{
-					"name": "Order Dashboard Stats",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/dashboard/stats",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"dashboard",
-								"stats"
-							]
-						}
-					}
-				},
-				{
-					"name": "Assign Carrier to Order",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"carrier_id\": 1,\n    \"service_type\": \"express\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders/1/assign-carrier",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1",
-								"assign-carrier"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Available Carriers",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/1/available-carriers",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1",
-								"available-carriers"
-							]
-						}
-					}
-				},
-				{
-					"name": "Orders Waiting for Shipment",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Returns shipment records whose related orders are in `shipped` or `delivered` status. Optional query params: `status` (shipment status), `search` (order number / tracking number), `per_page`.",
-						"url": {
-							"raw": "{{base_url}}/api/orders/waiting-shipment",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"waiting-shipment"
-							],
-							"query": [
-								{
-									"key": "status",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "search",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "per_page",
-									"value": "",
-									"disabled": true
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Order Shipping Settings",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Loads the shipping configuration context for a specific order, including the merchant defaults, available carrier options, and the order's current selections.",
-						"url": {
-							"raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"{{order_id}}",
-								"shipping-settings"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Order Shipping Settings",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"description": "Updates the merchant shipping presets and, optionally, overrides carrier selection for the order. When sending `carrier_id`, include `carrier_service_type`.",
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"default_destination\": \"local\",\n    \"default_service_type\": \"express\",\n    \"shipping_units\": [\n        {\n            \"destination\": \"local\",\n            \"service_type\": \"express\",\n            \"carrier_code\": \"israelpost\",\n            \"package_type\": \"box\",\n            \"quantity\": 1,\n            \"price\": 24.9\n        }\n    ],\n    \"carrier_id\": 5,\n    \"carrier_service_type\": \"express\",\n    \"shipping_type\": \"delivery\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"{{order_id}}",
-								"shipping-settings"
-							]
-						}
-					}
-				},
-				{
-					"name": "Calculate Order Shipping Cost",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"carrier_id\": 1,\n    \"service_type\": \"regular\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders/1/calculate-shipping-cost",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"1",
-								"calculate-shipping-cost"
-							]
-						}
-					}
-				},
-				{
-					"name": "Public Shipping Cost Estimate",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"carrier_id\": 1,\n    \"service_type\": \"express\",\n    \"weight\": 2.5\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/orders/calculate-shipping-cost",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"calculate-shipping-cost"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Category Catalog",
-			"item": [
-				{
-					"name": "List Categories",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/categories",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories"
-							]
-						}
-					}
-				},
-				{
-					"name": "List Category Tree",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/categories/tree",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories",
-								"tree"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Category",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/categories/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories",
-								"1"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Category Management (Admin Only)",
-			"item": [
-				{
-					"name": "Create Category",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Accessories\",\n    \"description\": \"Accessories and add-ons\",\n    \"parent_id\": 1,\n    \"is_active\": true,\n    \"sort_order\": 2\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/categories",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Category",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Updated Category Name\",\n    \"description\": \"Updated description\",\n    \"is_active\": false,\n    \"sort_order\": 5\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/categories/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete Category",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/categories/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"categories",
-								"1"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Product Catalog",
-			"item": [
-				{
-					"name": "List Products",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/products",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products"
-							]
-						}
-					}
-				},
-				{
-					"name": "List Products (Filtered)",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/products?category_id=1&in_stock=true&featured=true&search=mouse",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products"
-							],
-							"query": [
-								{
-									"key": "category_id",
-									"value": "1"
-								},
-								{
-									"key": "in_stock",
-									"value": "true"
-								},
-								{
-									"key": "featured",
-									"value": "true"
-								},
-								{
-									"key": "search",
-									"value": "mouse"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "List Featured Products",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/products/featured",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"featured"
-							]
-						}
-					}
-				},
-				{
-					"name": "Get Product",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_url}}/api/products/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"1"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "Product Management (Admin Only)",
-			"item": [
-				{
-					"name": "Create Product",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Wireless Mouse\",\n    \"description\": \"Ergonomic wireless mouse\",\n    \"sku\": \"WM-001\",\n    \"price\": 120.0,\n    \"sale_price\": 99.0,\n    \"stock_quantity\": 50,\n    \"min_stock_alert\": 5,\n    \"category_id\": 1,\n    \"is_active\": true,\n    \"is_featured\": false,\n    \"images\": [\n        \"https://example.com/images/mouse-front.jpg\",\n        \"https://example.com/images/mouse-side.jpg\"\n    ],\n    \"variations\": [\n        {\n            \"name\": \"Color\",\n            \"options\": [\"Black\", \"White\"]\n        }\n    ],\n    \"weight\": \"0.2kg\",\n    \"dimensions\": \"10x6x4cm\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/products",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products"
-							]
-						}
-					}
-				},
-				{
-					"name": "Update Product",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							},
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"price\": 110.0,\n    \"sale_price\": 89.0,\n    \"stock_quantity\": 45,\n    \"is_featured\": true\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/api/products/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "Delete Product",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/products/1",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"1"
-							]
-						}
-					}
-				},
-				{
-					"name": "List Low Stock Products",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/products/low-stock",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"low-stock"
-							]
-						}
-					}
-				}
-			]
-		},
-		{
-			"name": "נתוני דשבורד",
-			"item": [
-				{
-					"name": "סטטיסטיקות הזמנות",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/dashboard/stats",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"dashboard",
-								"stats"
-							]
-						}
-					}
-				},
-				{
-					"name": "הזמנות אחרונות",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders?per_page=5&sort=created_at&direction=desc",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders"
-							],
-							"query": [
-								{
-									"key": "per_page",
-									"value": "5"
-								},
-								{
-									"key": "sort",
-									"value": "created_at"
-								},
-								{
-									"key": "direction",
-									"value": "desc"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "מוצרים במלאי נמוך",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/products/low-stock",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"products",
-								"low-stock"
-							]
-						}
-					}
-				},
-				{
-					"name": "משלוחים בתהליך",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/shipments?status=in_transit",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"shipments"
-							],
-							"query": [
-								{
-									"key": "status",
-									"value": "in_transit"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "הזמנות בהמתנה",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{base_url}}/api/orders/status/pending?per_page=5",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"status",
-								"pending"
-							],
-							"query": [
-								{
-									"key": "per_page",
-									"value": "5"
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "ביצועי מכירות",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"description": "Retrieves sales totals for the dashboard chart. `range` supports `last_week`, `last_month`, `last_quarter`, `last_year`. You can override with `start_date` and `end_date` (YYYY-MM-DD).",
-						"url": {
-							"raw": "{{base_url}}/api/orders/dashboard/sales-performance?range=last_month",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"orders",
-								"dashboard",
-								"sales-performance"
-							],
-							"query": [
-								{
-									"key": "range",
-									"value": "last_month"
-								},
-								{
-									"key": "start_date",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "end_date",
-									"value": "",
-									"disabled": true
-								}
-							]
-						}
-					}
-				},
-				{
-					"name": "התראות מערכת (אדמין)",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{admin_token}}"
-							}
-						],
-						"description": "Loads the latest admin system alerts for the dashboard. Supports query params: `limit` (ברירת מחדל 5, עד 50), `include_archived`, `severity[]`, `category[]`.",
-						"url": {
-							"raw": "{{base_url}}/api/admin/dashboard/alerts?limit=5",
-							"host": [
-								"{{base_url}}"
-							],
-							"path": [
-								"api",
-								"admin",
-								"dashboard",
-								"alerts"
-							],
-							"query": [
-								{
-									"key": "limit",
-									"value": "5"
-								},
-								{
-									"key": "include_archived",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "severity[]",
-									"value": "",
-									"disabled": true
-								},
-								{
-									"key": "category[]",
-									"value": "",
-									"disabled": true
-								}
-							]
-						}
-					}
-				}
-			]
-		}
-	],
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:8000",
-			"type": "string"
-		},
-		{
-			"key": "token",
-			"value": "your_user_token_here",
-			"type": "string"
-		},
-		{
-			"key": "admin_token",
-			"value": "your_admin_token_here",
-			"type": "string"
-		},
-		{
-			"key": "merchant_token",
-			"value": "your_merchant_token_here",
-			"type": "string"
-		},
-		{
-			"key": "merchant_id",
-			"value": "1",
-			"type": "string"
-		},
-		{
-			"key": "order_id",
-			"value": "1",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "kfitz-api-collection",
+    "name": "KFitz API Collection",
+    "description": "Up-to-date API collection for KFitz Backend including role-based helpers and latest endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"new.user@example.com\",\n  \"password\": \"Password123!\",\n  \"password_confirmation\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login (custom credentials)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "const token = data.token;",
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(token, 'token').to.exist;",
+                  "});",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('auth_token', token);",
+                  "    pm.collectionVariables.set('active_role', 'custom');",
+                  "}",
+                  "if (data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('last_user_id', data.user.id.toString());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "const token = data.token;",
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(token, 'token').to.exist;",
+                  "});",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('auth_token', token);",
+                  "    pm.collectionVariables.set('admin_token', token);",
+                  "    pm.collectionVariables.set('active_role', 'admin');",
+                  "}",
+                  "if (data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('last_user_id', data.user.id.toString());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Agent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{agent_email}}\",\n  \"password\": \"{{agent_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "const token = data.token;",
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(token, 'token').to.exist;",
+                  "});",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('auth_token', token);",
+                  "    pm.collectionVariables.set('agent_token', token);",
+                  "    pm.collectionVariables.set('active_role', 'agent');",
+                  "}",
+                  "if (data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('last_user_id', data.user.id.toString());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login as Merchant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{merchant_email}}\",\n  \"password\": \"{{merchant_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "const token = data.token;",
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(token, 'token').to.exist;",
+                  "});",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('auth_token', token);",
+                  "    pm.collectionVariables.set('merchant_token', token);",
+                  "    pm.collectionVariables.set('active_role', 'merchant');",
+                  "}",
+                  "if (data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('last_user_id', data.user.id.toString());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.unset('auth_token');",
+                  "    pm.collectionVariables.set('active_role', '');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use stored Admin token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const storedToken = pm.collectionVariables.get('admin_token');",
+                  "pm.test('Token available for role', function () {",
+                  "    pm.expect(storedToken, 'stored token').to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('auth_token', storedToken);",
+                  "pm.collectionVariables.set('active_role', 'admin');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use stored Agent token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const storedToken = pm.collectionVariables.get('agent_token');",
+                  "pm.test('Token available for role', function () {",
+                  "    pm.expect(storedToken, 'stored token').to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('auth_token', storedToken);",
+                  "pm.collectionVariables.set('active_role', 'agent');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use stored Merchant token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const storedToken = pm.collectionVariables.get('merchant_token');",
+                  "pm.test('Token available for role', function () {",
+                  "    pm.expect(storedToken, 'stored token').to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('auth_token', storedToken);",
+                  "pm.collectionVariables.set('active_role', 'merchant');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use manual token value",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const manualToken = pm.collectionVariables.get('manual_token') || pm.environment.get('manual_token');",
+                  "pm.test('Manual token available', function () {",
+                  "    pm.expect(manualToken, 'manual token').to.exist;",
+                  "});",
+                  "pm.collectionVariables.set('auth_token', manualToken);",
+                  "pm.collectionVariables.set('active_role', 'manual');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "forgot-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{password_reset_token}}\",\n  \"email\": \"user@example.com\",\n  \"password\": \"NewPassword123!\",\n  \"password_confirmation\": \"NewPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Email Verification",
+      "item": [
+        {
+          "name": "Resend verification email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/email/verification-notification",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "email",
+                "verification-notification"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verification status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/email/verification-status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "email",
+                "verification-status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Verify via signed URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/email/verify/{{user_id}}/{{verification_hash}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "email",
+                "verify",
+                "{{user_id}}",
+                "{{verification_hash}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Frontend verify",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/verify-email",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "verify-email"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{user_id}}"
+                },
+                {
+                  "key": "hash",
+                  "value": "{{verification_hash}}"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Catalog",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Category tree",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/tree",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "tree"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{category_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{category_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "products"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Featured products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/featured",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "featured"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get product",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "{{product_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Low stock products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/low-stock",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "products",
+                "low-stock"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public Shipping & Tools",
+      "item": [
+        {
+          "name": "Active shipping carriers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipping-carriers/active",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipping-carriers",
+                "active"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Calculate carrier cost (public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}/calculate-cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipping-carriers",
+                "{{shipping_carrier_id}}",
+                "calculate-cost"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weight\": 2.5,\n  \"service_type\": \"regular\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Calculate shipping cost (public)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/calculate-shipping-cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "calculate-shipping-cost"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"service_type\": \"regular\",\n  \"weight\": 2.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Track shipment (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/track/{{tracking_number}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "track",
+                "{{tracking_number}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Serve product image",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/product-images/{{image_path}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "product-images",
+                "{{image_path}}"
+              ]
+            }
+          },
+          "description": "Replace {{image_path}} with the relative image path, e.g. products/sample.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Open orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/open",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "open"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Waiting for shipment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/waiting-shipment",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "waiting-shipment"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Closed orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/closed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "closed"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1,\n      \"unit_price\": 199.9,\n      \"discount\": 0\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2,\n      \"unit_price\": 79.9\n    }\n  ],\n  \"notes\": \"\u05d4\u05d6\u05de\u05e0\u05ea \u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"processing\",\n  \"payment_status\": \"pending\",\n  \"notes\": \"\u05e2\u05d3\u05db\u05d5\u05df \u05e1\u05d8\u05d8\u05d5\u05e1 \u05d4\u05d6\u05de\u05e0\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete order",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Orders by status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/status/{{order_status}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "status",
+                "{{order_status}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Dashboard stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/dashboard/stats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "dashboard",
+                "stats"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sales performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/dashboard/sales-performance",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "dashboard",
+                "sales-performance"
+              ],
+              "query": [
+                {
+                  "key": "range",
+                  "value": "last_week"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Assign carrier to order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/assign-carrier",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "assign-carrier"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"service_type\": \"regular\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Available carriers for order",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/available-carriers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "available-carriers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get order shipping settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "shipping-settings"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update order shipping settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/shipping-settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "shipping-settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"delivery_window\": \"09:00-14:00\",\n  \"requires_signature\": true,\n  \"leave_at_door\": false,\n  \"pickup_point\": null,\n  \"comments\": \"\u05e0\u05d0 \u05dc\u05d4\u05ea\u05e7\u05e9\u05e8 30 \u05d3\u05e7\u05d5\u05ea \u05dc\u05e4\u05e0\u05d9 \u05d4\u05d2\u05e2\u05d4\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Calculate order shipping cost",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}/calculate-shipping-cost",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders",
+                "{{order_id}}",
+                "calculate-shipping-cost"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"service_type\": \"regular\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shipments",
+      "item": [
+        {
+          "name": "List shipments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create shipment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/shipments",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"tracking_number\": \"TRACK12345\",\n  \"status\": \"pending\",\n  \"weight\": 2.6,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 15,\n  \"notes\": \"\u05de\u05e9\u05dc\u05d5\u05d7 \u05d1\u05d3\u05d9\u05e7\u05d4 - \u05d7\u05d5\u05dc\u05e6\u05d5\u05ea \u05d1\u05d9\u05d9\u05d1\u05d9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get shipment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/{{shipment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "{{shipment_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update shipment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/{{shipment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "{{shipment_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shipped\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete shipment",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/{{shipment_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "{{shipment_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Shipments by status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/status/{{shipment_status}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "status",
+                "{{shipment_status}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add tracking event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/shipments/{{shipment_id}}/tracking-events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "shipments",
+                "{{shipment_id}}",
+                "tracking-events"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_transit\",\n  \"location\": \"\u05de\u05e8\u05db\u05d6 \u05dc\u05d5\u05d2\u05d9\u05e1\u05d8\u05d9, \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n  \"details\": \"\u05d4\u05de\u05e9\u05dc\u05d5\u05d7 \u05de\u05d5\u05d9\u05df \u05d5\u05e0\u05e9\u05dc\u05d7 \u05dc\u05d4\u05e4\u05e6\u05d4\",\n  \"occurred_at\": \"2024-11-01T10:30:00+02:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Merchant",
+      "item": [
+        {
+          "name": "Merchant profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "profile"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update merchant profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "profile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"business_name\": \"Merchant LTD\",\n  \"business_id\": \"123456789\",\n  \"phone\": \"+97251000000\",\n  \"website\": \"https://merchant.example.com\",\n  \"description\": \"\u05d7\u05e0\u05d5\u05ea \u05dc\u05d3\u05d5\u05d2\u05de\u05d4 \u05dc\u05e9\u05dc\u05d9\u05d7\u05ea \u05d1\u05d3\u05d9\u05e7\u05d5\u05ea\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"company\": \"\u05d7\u05d1\u05e8\u05ea \u05dc\u05e7\u05d5\u05d7 \u05d1\u05e2\\\"\u05de\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d3\u05e8\u05da \u05d4\u05e9\u05dc\u05d5\u05dd 45\",\n    \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"bank_details\": {\n    \"bank_name\": \"\u05d4\u05e4\u05d5\u05e2\u05dc\u05d9\u05dd\",\n    \"branch_number\": \"123\",\n    \"account_number\": \"456789\",\n    \"account_name\": \"Merchant LTD\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Merchant dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "dashboard"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Merchant customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/customers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "customers"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get merchant customer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/customers/{{customer_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "customers",
+                "{{customer_id}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update merchant customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/merchant/customers/{{customer_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "merchant",
+                "customers",
+                "{{customer_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Customer\",\n  \"phone\": \"+972520000000\",\n  \"notes\": \"\u05de\u05e2\u05d3\u05d9\u05e3 \u05de\u05e1\u05d9\u05e8\u05d4 \u05d1\u05d1\u05d5\u05e7\u05e8\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Plugin order (merchant portal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1,\n      \"price\": 199.9\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2,\n      \"price\": 99.9\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"totals\": {\n    \"subtotal\": 399.7,\n    \"tax\": 0,\n    \"shipping_cost\": 0,\n    \"discount\": 0,\n    \"total\": 399.7\n  },\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard",
+          "item": [
+            {
+              "name": "Admin dashboard ping",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/dashboard",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "dashboard"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Dashboard alerts",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/dashboard/alerts",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "dashboard",
+                    "alerts"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Orders summary",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/orders/summary",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "orders",
+                    "summary"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "List users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/users",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create user",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/users",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New User\",\n  \"email\": \"new.user@example.com\",\n  \"password\": \"Password123!\",\n  \"role\": \"merchant\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Get user",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/users/{{user_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{user_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update user",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/users/{{user_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{user_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+972530000000\",\n  \"notes\": \"\u05e2\u05d5\u05d3\u05db\u05df \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Delete user",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/users/{{user_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "{{user_id}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Categories",
+          "item": [
+            {
+              "name": "Create category",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/categories",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Category\",\n  \"description\": \"\u05e7\u05d8\u05d2\u05d5\u05e8\u05d9\u05d4 \u05dc\u05d3\u05d5\u05d2\u05de\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Update category",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/categories/{{category_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories",
+                    "{{category_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Category\",\n  \"description\": \"\u05e2\u05d3\u05db\u05d5\u05df \u05e7\u05d8\u05d2\u05d5\u05e8\u05d9\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\",\n  \"is_active\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Delete category",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/categories/{{category_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories",
+                    "{{category_id}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Products",
+          "item": [
+            {
+              "name": "Create product",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/products",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "products"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"New Product\",\n  \"sku\": \"SKU-001\",\n  \"price\": 199.9,\n  \"stock_quantity\": 10,\n  \"category_id\": \"{{category_id}}\",\n  \"description\": \"\u05de\u05d5\u05e6\u05e8 \u05d7\u05d3\u05e9 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"status\": \"active\",\n  \"weight\": 1.5,\n  \"tax_rate\": 0.17\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Update product",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/products/{{product_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "products",
+                    "{{product_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Product\",\n  \"price\": 149.9,\n  \"stock_quantity\": 8,\n  \"status\": \"draft\",\n  \"weight\": 1.35\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Delete product",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/products/{{product_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "products",
+                    "{{product_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Upload product image",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "multipart/form-data"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/product-images",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "product-images"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "image",
+                      "type": "file",
+                      "src": [
+                        "/absolute/path/to/image.jpg"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "description": "Update the file path before sending."
+            }
+          ]
+        },
+        {
+          "name": "Merchants",
+          "item": [
+            {
+              "name": "List merchants",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/merchants",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchants"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create merchant",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/merchants",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchants"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"business_name\": \"Merchant Ltd\",\n  \"business_id\": \"987654321\",\n  \"phone\": \"+972540000000\",\n  \"status\": \"active\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"company\": \"\u05d7\u05d1\u05e8\u05ea \u05dc\u05e7\u05d5\u05d7 \u05d1\u05e2\\\"\u05de\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d3\u05e8\u05da \u05d4\u05e9\u05dc\u05d5\u05dd 45\",\n    \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Get merchant",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchants",
+                    "{{merchant_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update merchant",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchants",
+                    "{{merchant_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"suspended\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Delete merchant",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/merchants/{{merchant_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchants",
+                    "{{merchant_id}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Shipping",
+          "item": [
+            {
+              "name": "List carriers",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create carrier",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Speedy Express\",\n  \"code\": \"SPEEDY\",\n  \"description\": \"\u05d7\u05d1\u05e8\u05ea \u05de\u05e9\u05dc\u05d5\u05d7\u05d9\u05dd \u05de\u05d4\u05d9\u05e8\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"api_url\": \"https://carrier.example.com/api\",\n  \"api_key\": \"test-key\",\n  \"api_secret\": \"test-secret\",\n  \"base_rate\": 25,\n  \"rate_per_kg\": 9.9,\n  \"service_types\": [\n    \"regular\",\n    \"express\"\n  ],\n  \"is_active\": true,\n  \"is_test_mode\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Get carrier",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "{{shipping_carrier_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update carrier",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "{{shipping_carrier_id}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Delete carrier",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "{{shipping_carrier_id}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Carrier stats",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/stats",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "stats"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Test carrier connection",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}/test-connection",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "{{shipping_carrier_id}}",
+                    "test-connection"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Admin calculate carrier cost",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/shipping-carriers/{{shipping_carrier_id}}/calculate-cost",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "shipping-carriers",
+                    "{{shipping_carrier_id}}",
+                    "calculate-cost"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"weight\": 3.2,\n  \"service_type\": \"express\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Get merchant shipping settings",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/merchant/shipping-settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchant",
+                    "shipping-settings"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update merchant shipping settings",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/merchant/shipping-settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "merchant",
+                    "shipping-settings"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"default_carrier_id\": \"{{shipping_carrier_id}}\",\n  \"allow_express\": true,\n  \"allow_pickup\": false,\n  \"handling_time_hours\": 24,\n  \"default_service_type\": \"regular\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plugin Sites",
+          "item": [
+            {
+              "name": "List plugin sites",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/plugin-sites",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "plugin-sites"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Create plugin site",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/plugin-sites",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "plugin-sites"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Shopify Store\",\n  \"site_url\": \"https://shop.example.com\",\n  \"platform\": \"shopify\",\n  \"status\": \"active\",\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"api_key\": \"shopify-api-key\",\n  \"api_secret\": \"shopify-secret\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "active_role",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "agent_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "merchant_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "manual_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "password",
+      "type": "string"
+    },
+    {
+      "key": "agent_email",
+      "value": "agent@example.com",
+      "type": "string"
+    },
+    {
+      "key": "agent_password",
+      "value": "password",
+      "type": "string"
+    },
+    {
+      "key": "merchant_email",
+      "value": "merchant@example.com",
+      "type": "string"
+    },
+    {
+      "key": "merchant_password",
+      "value": "password",
+      "type": "string"
+    },
+    {
+      "key": "password_reset_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "category_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "product_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "secondary_product_id",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "order_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "order_status",
+      "value": "pending",
+      "type": "string"
+    },
+    {
+      "key": "shipment_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "shipment_status",
+      "value": "pending",
+      "type": "string"
+    },
+    {
+      "key": "customer_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "merchant_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "merchant_customer_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "shipping_carrier_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "plugin_site_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "plugin_site_url",
+      "value": "https://merchant.example.com",
+      "type": "string"
+    },
+    {
+      "key": "plugin_order_number",
+      "value": "TEST-1001",
+      "type": "string"
+    },
+    {
+      "key": "tracking_number",
+      "value": "TRACK12345",
+      "type": "string"
+    },
+    {
+      "key": "verification_hash",
+      "value": "hash",
+      "type": "string"
+    },
+    {
+      "key": "image_path",
+      "value": "products/sample.jpg",
+      "type": "string"
+    },
+    {
+      "key": "last_user_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
 }
