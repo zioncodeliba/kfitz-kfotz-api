@@ -661,6 +661,22 @@ class OrderController extends Controller
         $paidOrdersCount = (clone $paidOrdersQuery)->count();
 
         $startOfCurrentMonth = Carbon::now()->startOfMonth();
+        $endOfCurrentMonth = $startOfCurrentMonth->copy()->endOfMonth();
+
+        $currentMonthOutstandingQuery = (clone $outstandingQuery)->whereBetween(
+            'created_at',
+            [$startOfCurrentMonth, $endOfCurrentMonth]
+        );
+        $currentMonthOutstandingTotal = (float) (clone $currentMonthOutstandingQuery)->sum('total');
+        $currentMonthOutstandingCount = (clone $currentMonthOutstandingQuery)->count();
+
+        $currentMonthPaidQuery = (clone $paidOrdersQuery)->whereBetween(
+            'created_at',
+            [$startOfCurrentMonth, $endOfCurrentMonth]
+        );
+        $currentMonthPaidTotal = (float) (clone $currentMonthPaidQuery)->sum('total');
+        $currentMonthPaidCount = (clone $currentMonthPaidQuery)->count();
+
         $historicalPaidQuery = Order::query()
             ->where('created_at', '<', $startOfCurrentMonth)
             ->where('payment_status', 'paid');
@@ -690,10 +706,19 @@ class OrderController extends Controller
                 'unpaid_count' => $historicalUnpaidCount,
             ],
             'payment_overview' => [
-                'outstanding_total' => round($outstandingTotal, 2),
-                'outstanding_count' => $outstandingCount,
-                'paid_total' => round($paidOrdersTotal, 2),
-                'paid_count' => $paidOrdersCount,
+                'outstanding_total' => round($currentMonthOutstandingTotal, 2),
+                'outstanding_count' => $currentMonthOutstandingCount,
+                'paid_total' => round($currentMonthPaidTotal, 2),
+                'paid_count' => $currentMonthPaidCount,
+                'all_time_outstanding_total' => round($outstandingTotal, 2),
+                'all_time_outstanding_count' => $outstandingCount,
+                'all_time_paid_total' => round($paidOrdersTotal, 2),
+                'all_time_paid_count' => $paidOrdersCount,
+                'period' => [
+                    'label' => 'current_month',
+                    'start' => $startOfCurrentMonth->toDateString(),
+                    'end' => $endOfCurrentMonth->toDateString(),
+                ],
             ],
         ]);
     }

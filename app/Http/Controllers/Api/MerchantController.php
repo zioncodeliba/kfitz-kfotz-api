@@ -379,16 +379,26 @@ class MerchantController extends Controller
             return $this->errorResponse('Merchant profile not found', 404);
         }
 
-        $currentMonthUnpaidQuery = $merchant->orders()
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
+        $startOfCurrentMonth = Carbon::now()->startOfMonth();
+        $endOfCurrentMonth = $startOfCurrentMonth->copy()->endOfMonth();
+
+        $currentMonthOutstandingQuery = $merchant->orders()
+            ->whereBetween('created_at', [$startOfCurrentMonth, $endOfCurrentMonth])
             ->where(function ($query) {
                 $query->whereNull('payment_status')
                     ->orWhere('payment_status', '!=', 'paid');
-            });
+            })
+            ->whereNotIn('status', ['cancelled', 'canceled']);
 
-        $currentMonthOutstanding = (clone $currentMonthUnpaidQuery)->sum('total');
-        $currentMonthUnpaidCount = $currentMonthUnpaidQuery->count();
+        $currentMonthOutstanding = (clone $currentMonthOutstandingQuery)->sum('total');
+        $currentMonthOutstandingCount = $currentMonthOutstandingQuery->count();
+
+        $currentMonthPaidQuery = $merchant->orders()
+            ->whereBetween('created_at', [$startOfCurrentMonth, $endOfCurrentMonth])
+            ->where('payment_status', 'paid');
+
+        $currentMonthPaidTotal = (clone $currentMonthPaidQuery)->sum('total');
+        $currentMonthPaidCount = $currentMonthPaidQuery->count();
 
         $lowStockCount = Product::lowStock()->count();
         $availableProductsCount = Product::inStock()->count();
@@ -410,10 +420,9 @@ class MerchantController extends Controller
             'credit_limit' => $merchant->credit_limit,
             'low_stock_products' => $lowStockCount,
             'available_products' => $availableProductsCount,
-            'current_month_unpaid_orders' => $currentMonthUnpaidCount,
+            'current_month_unpaid_orders' => $currentMonthOutstandingCount,
         ];
 
-        $startOfCurrentMonth = Carbon::now()->startOfMonth();
         $historicalOrdersQuery = $merchant->orders()->where('created_at', '<', $startOfCurrentMonth);
 
         $historicalPaidQuery = (clone $historicalOrdersQuery)->where('payment_status', 'paid');
@@ -439,10 +448,19 @@ class MerchantController extends Controller
         ];
 
         $stats['payment_overview'] = [
-            'outstanding_total' => round($stats['outstanding_balance'], 2),
-            'outstanding_count' => $outstandingOrdersCount,
-            'paid_total' => round($paidOrdersTotal, 2),
-            'paid_count' => $paidOrdersCount,
+            'outstanding_total' => round($currentMonthOutstanding, 2),
+            'outstanding_count' => $currentMonthOutstandingCount,
+            'paid_total' => round($currentMonthPaidTotal, 2),
+            'paid_count' => $currentMonthPaidCount,
+            'all_time_outstanding_total' => round($stats['outstanding_balance'], 2),
+            'all_time_outstanding_count' => $outstandingOrdersCount,
+            'all_time_paid_total' => round($paidOrdersTotal, 2),
+            'all_time_paid_count' => $paidOrdersCount,
+            'period' => [
+                'label' => 'current_month',
+                'start' => $startOfCurrentMonth->toDateString(),
+                'end' => $endOfCurrentMonth->toDateString(),
+            ],
         ];
 
         return $this->successResponse($stats);
