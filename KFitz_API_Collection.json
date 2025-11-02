@@ -1578,7 +1578,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1,\n      \"price\": 199.9\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2,\n      \"price\": 99.9\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"totals\": {\n    \"subtotal\": 399.7,\n    \"tax\": 0,\n    \"shipping_cost\": 0,\n    \"discount\": 0,\n    \"total\": 399.7\n  },\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"totals\": {\n    \"subtotal\": 399.7,\n    \"tax\": 0,\n    \"shipping_cost\": 0,\n    \"discount\": 0,\n    \"total\": 399.7\n  },\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2437,11 +2437,8 @@
     },
     {
       "key": "manual_token",
-			"value": ""
-		},
-		{
-			"key": "merchant_token2",
-			"value": ""
+      "value": "",
+      "type": "string"
     },
     {
       "key": "admin_email",
@@ -2450,35 +2447,28 @@
     },
     {
       "key": "admin_password",
-      "value": "password123",
+      "value": "password",
       "type": "string"
     },
     {
       "key": "agent_email",
-      "value": "zioncrm222@gmail.com",
+      "value": "agent@example.com",
       "type": "string"
     },
     {
       "key": "agent_password",
-      "value": "12345678",
+      "value": "password",
       "type": "string"
     },
     {
       "key": "merchant_email",
-      "value": "zizi1@gmail.com",
+      "value": "merchant@example.com",
       "type": "string"
     },
     {
       "key": "merchant_password",
-			"value": "123456"
-		},
-		{
-			"key": "merchant_email2",
-			"value": "zioncodeliba@gmail.com"
-		},
-		{
-			"key": "merchant_password2",
-			"value": "password123"
+      "value": "password",
+      "type": "string"
     },
     {
       "key": "password_reset_token",

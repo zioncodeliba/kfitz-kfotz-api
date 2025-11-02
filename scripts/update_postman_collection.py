@@ -645,8 +645,8 @@ def merchant_folder():
                     "order_number": "PLUGIN-{{plugin_order_number}}",
                     "total": 399.7,
                     "items": [
-                        {"product_id": "{{product_id}}", "quantity": 1, "price": 199.9},
-                        {"product_id": "{{secondary_product_id}}", "quantity": 2, "price": 99.9},
+                        {"product_id": "{{product_id}}", "quantity": 1},
+                        {"product_id": "{{secondary_product_id}}", "quantity": 2},
                     ],
                     "customer": {
                         "name": "נועם הלקוח",
