@@ -2437,8 +2437,11 @@
     },
     {
       "key": "manual_token",
-      "value": "",
-      "type": "string"
+			"value": ""
+		},
+		{
+			"key": "merchant_token2",
+			"value": ""
     },
     {
       "key": "admin_email",
@@ -2447,28 +2450,35 @@
     },
     {
       "key": "admin_password",
-      "value": "password",
+      "value": "password123",
       "type": "string"
     },
     {
       "key": "agent_email",
-      "value": "agent@example.com",
+      "value": "zioncrm222@gmail.com",
       "type": "string"
     },
     {
       "key": "agent_password",
-      "value": "password",
+      "value": "12345678",
       "type": "string"
     },
     {
       "key": "merchant_email",
-      "value": "merchant@example.com",
+      "value": "zizi1@gmail.com",
       "type": "string"
     },
     {
       "key": "merchant_password",
-      "value": "password",
-      "type": "string"
+			"value": "123456"
+		},
+		{
+			"key": "merchant_email2",
+			"value": "zioncodeliba@gmail.com"
+		},
+		{
+			"key": "merchant_password2",
+			"value": "password123"
     },
     {
       "key": "password_reset_token",
