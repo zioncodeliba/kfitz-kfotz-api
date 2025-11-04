@@ -85,6 +85,12 @@ class ProductController extends Controller
             'is_featured' => 'boolean',
             'images' => 'nullable|array',
             'variations' => 'nullable|array',
+            'variations.*.id' => 'nullable|integer|exists:product_variations,id',
+            'variations.*.sku' => 'nullable|string|max:255',
+            'variations.*.inventory' => 'nullable|integer|min:0',
+            'variations.*.price' => 'nullable|numeric|min:0',
+            'variations.*.attributes' => 'nullable|array',
+            'variations.*.image' => 'nullable|string|max:1024',
             'weight' => 'nullable|string',
             'dimensions' => 'nullable|string',
             'merchant_prices' => 'nullable|array',
@@ -110,9 +116,23 @@ class ProductController extends Controller
             );
         }
 
+        $variationPayload = [];
+        if ($request->has('variations')) {
+            $variationPayload = $this->normalizeProductVariations(
+                $request->input('variations', [])
+            );
+            unset($validated['variations']);
+        }
+
         $product = Product::create($validated);
 
-        return $this->createdResponse($product->load('category'), 'Product created successfully');
+        if ($request->has('variations')) {
+            $this->syncProductVariations($product, $variationPayload);
+        }
+
+        $product->load(['category', 'productVariations']);
+
+        return $this->createdResponse($product, 'Product created successfully');
     }
 
     /**
@@ -120,7 +140,7 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        $product = Product::with(['category'])->findOrFail($id);
+        $product = Product::with(['category', 'productVariations'])->findOrFail($id);
 
         return $this->successResponse($product);
     }
@@ -145,6 +165,12 @@ class ProductController extends Controller
             'is_featured' => 'boolean',
             'images' => 'nullable|array',
             'variations' => 'nullable|array',
+            'variations.*.id' => 'nullable|integer|exists:product_variations,id',
+            'variations.*.sku' => 'nullable|string|max:255',
+            'variations.*.inventory' => 'nullable|integer|min:0',
+            'variations.*.price' => 'nullable|numeric|min:0',
+            'variations.*.attributes' => 'nullable|array',
+            'variations.*.image' => 'nullable|string|max:1024',
             'weight' => 'nullable|string',
             'dimensions' => 'nullable|string',
             'merchant_prices' => 'nullable|array',
@@ -170,9 +196,23 @@ class ProductController extends Controller
             );
         }
 
+        $variationPayload = null;
+        if ($request->has('variations')) {
+            $variationPayload = $this->normalizeProductVariations(
+                $request->input('variations', [])
+            );
+            unset($validated['variations']);
+        }
+
         $product->update($validated);
 
-        return $this->successResponse($product->load('category'), 'Product updated successfully');
+        if ($variationPayload !== null) {
+            $this->syncProductVariations($product, $variationPayload);
+        }
+
+        $product->load(['category', 'productVariations']);
+
+        return $this->successResponse($product, 'Product updated successfully');
     }
 
     /**
@@ -355,6 +395,141 @@ class ProductController extends Controller
         }
 
         return $normalized;
+    }
+
+    protected function normalizeProductVariations(array $rawVariations): array
+    {
+        if (empty($rawVariations)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($rawVariations as $row) {
+            if (is_object($row)) {
+                $row = (array) $row;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            $rows[] = $row;
+        }
+
+        if (empty($rows)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($rows as $row) {
+            $id = null;
+            if (isset($row['id'])) {
+                $candidate = filter_var($row['id'], FILTER_VALIDATE_INT);
+                if (is_int($candidate) && $candidate > 0) {
+                    $id = $candidate;
+                }
+            }
+
+            $sku = isset($row['sku']) ? trim((string) $row['sku']) : null;
+            $sku = $sku !== '' ? $sku : null;
+
+            $inventory = 0;
+            if (isset($row['inventory'])) {
+                if (is_numeric($row['inventory'])) {
+                    $inventory = (int) max(0, (int) $row['inventory']);
+                }
+            }
+
+            $price = null;
+            if (isset($row['price']) && is_numeric($row['price'])) {
+                $price = round((float) $row['price'], 2);
+            }
+
+            $attributes = [];
+            if (isset($row['attributes']) && is_array($row['attributes'])) {
+                foreach ($row['attributes'] as $key => $value) {
+                    if (!is_string($key) || $key === '') {
+                        continue;
+                    }
+                    if (is_scalar($value) || (is_object($value) && method_exists($value, '__toString'))) {
+                        $attributes[$key] = trim((string) $value);
+                    }
+                }
+            }
+
+            $image = isset($row['image']) ? trim((string) $row['image']) : null;
+            $image = $image !== '' ? $image : null;
+
+            $normalized[] = [
+                'id' => $id,
+                'sku' => $sku,
+                'inventory' => $inventory,
+                'price' => $price,
+                'attributes' => $attributes,
+                'image' => $image,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function syncProductVariations(Product $product, array $variations): void
+    {
+        $existing = $product->productVariations()->get()->keyBy('id');
+        $retainedIds = [];
+
+        foreach ($variations as $variation) {
+            $payload = [
+                'sku' => $variation['sku'] ?? null,
+                'inventory' => $variation['inventory'] ?? 0,
+                'price' => $variation['price'] ?? null,
+                'attributes' => $variation['attributes'] ?? [],
+                'image' => $variation['image'] ?? null,
+            ];
+
+            $variationId = $variation['id'] ?? null;
+            if ($variationId && $existing->has($variationId)) {
+                $record = $existing->get($variationId);
+                if ($record->product_id !== $product->id) {
+                    continue;
+                }
+                $record->fill($payload)->save();
+                $retainedIds[] = $record->id;
+                continue;
+            }
+
+            $created = $product->productVariations()->create($payload);
+            $retainedIds[] = $created->id;
+        }
+
+        if (!empty($retainedIds)) {
+            $product->productVariations()->whereNotIn('id', $retainedIds)->delete();
+        } else {
+            $product->productVariations()->delete();
+        }
+
+        $this->refreshProductVariationsSnapshot($product);
+    }
+
+    protected function refreshProductVariationsSnapshot(Product $product): void
+    {
+        $collection = $product->productVariations()->orderBy('id')->get();
+
+        $snapshot = $collection->map(function ($variation) {
+            return [
+                'id' => $variation->id,
+                'sku' => $variation->sku,
+                'inventory' => (int) $variation->inventory,
+                'price' => $variation->price !== null ? (float) $variation->price : null,
+                'attributes' => $variation->attributes ?? [],
+                'image' => $variation->image,
+            ];
+        })->values()->toArray();
+
+        $product->forceFill([
+            'variations' => $snapshot,
+        ])->save();
+
+        $product->setRelation('productVariations', $collection);
     }
 
     /**

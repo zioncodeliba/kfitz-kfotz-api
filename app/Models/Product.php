@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -89,5 +90,10 @@ class Product extends Model
     public function scopeLowStock($query)
     {
         return $query->whereRaw('stock_quantity <= min_stock_alert');
+    }
+
+    public function productVariations(): HasMany
+    {
+        return $this->hasMany(ProductVariation::class);
     }
 }

@@ -100,6 +100,14 @@ class PluginOrderController extends Controller
                     return $this->errorResponse('One or more products were not found for this merchant.', 422);
                 }
 
+                if (!$this->isProductAvailableForPluginSite($product, $site->id)) {
+                    DB::rollBack();
+                    return $this->errorResponse(sprintf(
+                        'Product %s is not available for this plugin site.',
+                        $product->name
+                    ), 422);
+                }
+
                 $quantity = max((float) ($item['quantity'] ?? 0), 0.0001);
 
                 if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
@@ -107,7 +115,8 @@ class PluginOrderController extends Controller
                     return $this->errorResponse(sprintf('Insufficient stock for product: %s', $product->name), 400);
                 }
 
-                $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantUser->id)
+                $unitPrice = $this->resolvePluginSiteUnitPrice($product, $site->id)
+                    ?? $this->resolveMerchantUnitPrice($product, $merchantUser->id)
                     ?? $product->getCurrentPrice();
                 $totalPrice = $unitPrice * $quantity;
 
@@ -406,6 +415,92 @@ class PluginOrderController extends Controller
         $digits = preg_replace('/\D+/', '', $phone);
 
         return $digits !== '' ? $digits : null;
+    }
+
+    /**
+     * Pick a unit price dedicated to a specific plugin site when available.
+     */
+    protected function resolvePluginSiteUnitPrice(Product $product, int $siteId): ?float
+    {
+        if ($siteId <= 0) {
+            return null;
+        }
+
+        $prices = $product->plugin_site_prices;
+        if (!is_array($prices) || empty($prices)) {
+            return null;
+        }
+
+        foreach ($prices as $entry) {
+            if (is_object($entry)) {
+                $entry = (array) $entry;
+            }
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $entrySiteId = $entry['site_id'] ?? null;
+            if ($entrySiteId === null) {
+                continue;
+            }
+
+            if ((int) $entrySiteId !== $siteId) {
+                continue;
+            }
+
+            if (array_key_exists('is_enabled', $entry) && !$entry['is_enabled']) {
+                return null;
+            }
+
+            $rawPrice = $entry['price'] ?? null;
+            if (is_numeric($rawPrice)) {
+                $price = (float) $rawPrice;
+                return $price >= 0 ? $price : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine whether a product is available for orders coming from a plugin site.
+     */
+    protected function isProductAvailableForPluginSite(Product $product, int $siteId): bool
+    {
+        if ($siteId <= 0) {
+            return true;
+        }
+
+        $prices = $product->plugin_site_prices;
+        if (!is_array($prices) || empty($prices)) {
+            return true;
+        }
+
+        foreach ($prices as $entry) {
+            if (is_object($entry)) {
+                $entry = (array) $entry;
+            }
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $entrySiteId = $entry['site_id'] ?? null;
+            if ($entrySiteId === null) {
+                continue;
+            }
+
+            if ((int) $entrySiteId !== $siteId) {
+                continue;
+            }
+
+            if (!array_key_exists('is_enabled', $entry)) {
+                return true;
+            }
+
+            return filter_var($entry['is_enabled'], FILTER_VALIDATE_BOOLEAN) !== false;
+        }
+
+        return true;
     }
 
     protected function resolveMerchantUnitPrice(Product $product, int $merchantUserId): ?float
