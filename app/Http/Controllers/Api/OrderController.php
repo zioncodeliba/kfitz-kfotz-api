@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Traits\ApiResponse;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariation;
 use App\Models\ShippingCarrier;
 use App\Models\Shipment;
 use App\Models\Merchant;
@@ -182,6 +183,7 @@ class OrderController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.variation_id' => 'nullable|integer|exists:product_variations,id',
             'shipping_address' => 'required|array',
             'billing_address' => 'required|array',
             'shipping_type' => 'required|in:delivery,pickup',
@@ -237,21 +239,52 @@ class OrderController extends Controller
                 }
             }
 
-            $items = $data['items'];
+            $rawItems = $data['items'];
+            $normalizedItems = [];
             $subtotal = 0;
 
-            // Calculate subtotal and validate stock
-            foreach ($items as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                
-                if ($product->stock_quantity < $item['quantity']) {
+            foreach ($rawItems as $item) {
+                $productId = (int) $item['product_id'];
+                $quantity = (int) $item['quantity'];
+
+                $product = Product::with('productVariations')->findOrFail($productId);
+
+                if ($product->stock_quantity < $quantity) {
                     return $this->errorResponse("Insufficient stock for product: {$product->name}", 400);
                 }
 
-                $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantId)
-                    ?? $product->getCurrentPrice();
-                $itemTotal = $unitPrice * $item['quantity'];
+                $variation = null;
+                if (array_key_exists('variation_id', $item) && $item['variation_id'] !== null) {
+                    $variationId = (int) $item['variation_id'];
+                    $variation = $product->productVariations->firstWhere('id', $variationId);
+
+                    if (!$variation) {
+                        return $this->errorResponse('Selected variation does not belong to the chosen product.', 422);
+                    }
+
+                    if ($variation->inventory !== null && $variation->inventory < $quantity) {
+                        return $this->errorResponse("Insufficient stock for selected variation of product: {$product->name}", 400);
+                    }
+                }
+
+                if ($product->productVariations->isNotEmpty() && !$variation) {
+                    return $this->errorResponse('Variation is required for products that have defined variations.', 422);
+                }
+
+                $pricing = $this->determineUnitPrice($product, $variation, $merchantId);
+                $unitPrice = $pricing['unit_price'];
+                $itemTotal = $unitPrice * $quantity;
+
                 $subtotal += $itemTotal;
+
+                $normalizedItems[] = [
+                    'product' => $product,
+                    'variation' => $variation,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'item_total' => $itemTotal,
+                    'pricing' => $pricing,
+                ];
             }
 
             // Calculate totals
@@ -331,27 +364,59 @@ class OrderController extends Controller
             }
 
             // Create order items and update stock
-            foreach ($items as $item) {
-                $product = Product::findOrFail($item['product_id']);
-                $unitPrice = $this->resolveMerchantUnitPrice($product, $merchantId)
-                    ?? $product->getCurrentPrice();
-                $itemTotal = $unitPrice * $item['quantity'];
+            $productsToRefresh = [];
+
+            foreach ($normalizedItems as $itemData) {
+                /** @var Product $product */
+                $product = $itemData['product'];
+                /** @var ProductVariation|null $variation */
+                $variation = $itemData['variation'];
+                $quantity = $itemData['quantity'];
+                $unitPrice = $itemData['unit_price'];
+                $itemTotal = $itemData['item_total'];
+                $pricing = $itemData['pricing'];
+
+                $productSku = $product->sku;
+                if ($variation && $variation->sku) {
+                    $productSku = $variation->sku;
+                }
+
+                $productData = [
+                    'description' => $product->description,
+                    'images' => $product->images,
+                    'pricing' => $pricing,
+                ];
+
+                if ($variation) {
+                    $productData['variation'] = [
+                        'id' => $variation->id,
+                        'sku' => $variation->sku,
+                        'attributes' => $variation->attributes,
+                        'image' => $variation->image,
+                    ];
+                }
 
                 $order->items()->create([
                     'product_id' => $product->id,
                     'product_name' => $product->name,
-                    'product_sku' => $product->sku,
-                    'quantity' => $item['quantity'],
+                    'product_sku' => $productSku,
+                    'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'total_price' => $itemTotal,
-                    'product_data' => [
-                        'description' => $product->description,
-                        'images' => $product->images,
-                    ],
+                    'product_data' => $productData,
                 ]);
 
                 // Update stock
-                $product->decrement('stock_quantity', $item['quantity']);
+                $product->decrement('stock_quantity', $quantity);
+                if ($variation && $variation->inventory !== null) {
+                    $variation->decrement('inventory', $quantity);
+                }
+
+                $productsToRefresh[$product->id] = $product;
+            }
+
+            foreach ($productsToRefresh as $productToRefresh) {
+                $this->refreshProductVariationsSnapshot($productToRefresh);
             }
 
             DB::commit();
@@ -407,6 +472,72 @@ class OrderController extends Controller
         }
 
         return null;
+    }
+
+    protected function determineUnitPrice(
+        Product $product,
+        ?ProductVariation $variation,
+        ?int $merchantUserId
+    ): array {
+        $productPrice = max(0, (float) $product->getCurrentPrice());
+        $merchantPrice = $this->resolveMerchantUnitPrice($product, $merchantUserId);
+
+        if ($merchantPrice !== null && $merchantPrice < 0) {
+            $merchantPrice = null;
+        }
+
+        $basePrice = $merchantPrice !== null ? $merchantPrice : $productPrice;
+
+        $variationPrice = null;
+        if ($variation && $variation->price !== null && is_numeric($variation->price)) {
+            $candidateVariationPrice = (float) $variation->price;
+            if ($candidateVariationPrice >= 0) {
+                $variationPrice = $candidateVariationPrice;
+            }
+        }
+
+        $unitPrice = $basePrice;
+        if ($variationPrice !== null && $variationPrice < $basePrice) {
+            $unitPrice = $variationPrice;
+        }
+
+        $unitPrice = round($unitPrice, 2);
+        $productPrice = round($productPrice, 2);
+        if ($merchantPrice !== null) {
+            $merchantPrice = round($merchantPrice, 2);
+        }
+        if ($variationPrice !== null) {
+            $variationPrice = round($variationPrice, 2);
+        }
+
+        return [
+            'unit_price' => $unitPrice,
+            'product_price' => $productPrice,
+            'merchant_price' => $merchantPrice,
+            'variation_price' => $variationPrice,
+        ];
+    }
+
+    protected function refreshProductVariationsSnapshot(Product $product): void
+    {
+        $collection = $product->productVariations()->orderBy('id')->get();
+
+        $snapshot = $collection->map(function (ProductVariation $variation) {
+            return [
+                'id' => $variation->id,
+                'sku' => $variation->sku,
+                'inventory' => (int) $variation->inventory,
+                'price' => $variation->price !== null ? (float) $variation->price : null,
+                'attributes' => $variation->attributes ?? [],
+                'image' => $variation->image,
+            ];
+        })->values()->toArray();
+
+        $product->forceFill([
+            'variations' => $snapshot,
+        ])->save();
+
+        $product->setRelation('productVariations', $collection);
     }
 
     /**

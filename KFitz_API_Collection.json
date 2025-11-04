@@ -718,7 +718,25 @@
                 "{{product_id}}"
               ]
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.test('Response contains product data', function () {",
+                  "    pm.expect(json).to.have.property('data');",
+                  "});",
+                  "const product = json.data || {};",
+                  "pm.test('Product includes variations snapshot', function () {",
+                  "    pm.expect(product).to.have.property('variations');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Low stock products",
@@ -962,7 +980,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1,\n      \"unit_price\": 199.9,\n      \"discount\": 0\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2,\n      \"unit_price\": 79.9\n    }\n  ],\n  \"notes\": \"\u05d4\u05d6\u05de\u05e0\u05ea \u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\"\n}",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"notes\": \"\u05d4\u05d6\u05de\u05e0\u05ea \u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -970,6 +988,55 @@
               }
             }
           }
+        },
+        {
+          "name": "Create order (missing variation - expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"\u05e0\u05d9\u05e1\u05d5\u05df: \u05d7\u05d5\u05e1\u05e8 \\u05d0\\u05d7\\u05d3 \\u05e6\\u05e8\\u05d9\\u05da\\u05e9\\u05dc\\u05d9\\u05d1\\u05d3\\u05d5\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns 422 when variation missing', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "const message = (body && body.message ? body.message : '').toLowerCase();",
+                  "pm.test('Error message mentions variation', function () {",
+                  "    pm.expect(message).to.include('variation');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Get order",
@@ -1578,7 +1645,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1586,6 +1653,56 @@
               }
             }
           }
+        },
+        {
+          "name": "Plugin order (missing variation - expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"MISSING-VAR-{{plugin_order_number}}\",\n  \"total\": 199.9,\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05de\u05d1\u05d7\u05df \u05e4\u05dc\u05d0\u05d2\u05d9\u05df\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 12\",\n      \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"state\": \"\u05d4\u05de\u05e9 \u05d4\",\n      \"zip\": \"12345\",\n      \"country\": \"IL\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Returns 422 when plugin variation missing', function () {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "const message = (body && body.message ? body.message : '').toLowerCase();",
+                  "pm.test('Error mentions variation', function () {",
+                  "    pm.expect(message).to.include('variation');",
+                  "});"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -2508,6 +2625,21 @@
     {
       "key": "secondary_product_id",
       "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "product_variation_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "secondary_product_variation_id",
+      "value": "2",
+      "type": "string"
+    },
+    {
+      "key": "variant_product_id",
+      "value": "1",
       "type": "string"
     },
     {

@@ -8,6 +8,7 @@ use App\Models\MerchantCustomer;
 use App\Models\MerchantSite;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductVariation;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class PluginOrderController extends Controller
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.sku' => 'nullable|string|max:100',
             'items.*.quantity' => 'required|numeric|min:0.0001',
+            'items.*.variation_id' => 'nullable|integer|exists:product_variations,id',
             'totals' => 'nullable|array',
             'totals.subtotal' => 'nullable|numeric|min:0',
             'totals.tax' => 'nullable|numeric|min:0',
@@ -78,7 +80,7 @@ class PluginOrderController extends Controller
             $items = collect($data['items']);
 
             $productIds = $items->pluck('product_id')->map(fn ($id) => (int) $id)->unique()->values();
-            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+            $products = Product::with('productVariations')->whereIn('id', $productIds)->get()->keyBy('id');
 
             if ($products->count() !== $productIds->count()) {
                 DB::rollBack();
@@ -86,7 +88,7 @@ class PluginOrderController extends Controller
             }
 
             $computedSubtotal = 0;
-            $orderItemsPayload = [];
+            $normalizedItems = [];
 
             foreach ($items as $item) {
                 if (!is_array($item)) {
@@ -115,24 +117,43 @@ class PluginOrderController extends Controller
                     return $this->errorResponse(sprintf('Insufficient stock for product: %s', $product->name), 400);
                 }
 
-                $unitPrice = $this->resolvePluginSiteUnitPrice($product, $site->id)
-                    ?? $this->resolveMerchantUnitPrice($product, $merchantUser->id)
-                    ?? $product->getCurrentPrice();
+                $variation = null;
+                if (array_key_exists('variation_id', $item) && $item['variation_id'] !== null) {
+                    $variationId = (int) $item['variation_id'];
+                    $variation = $product->productVariations->firstWhere('id', $variationId);
+
+                    if (!$variation) {
+                        DB::rollBack();
+                        return $this->errorResponse('Selected variation does not belong to the chosen product.', 422);
+                    }
+
+                    if ($variation->inventory !== null && $variation->inventory < $quantity) {
+                        DB::rollBack();
+                        return $this->errorResponse(sprintf('Insufficient stock for selected variation of product: %s', $product->name), 400);
+                    }
+                }
+
+                if ($product->productVariations->isNotEmpty() && !$variation) {
+                    DB::rollBack();
+                    return $this->errorResponse(sprintf('Product %s requires selecting a variation.', $product->name), 422);
+                }
+
+                $pluginPrice = $this->resolvePluginSiteUnitPrice($product, $site->id);
+                $merchantPrice = $this->resolveMerchantUnitPrice($product, $merchantUser->id);
+                $pricing = $this->determinePluginUnitPrice($product, $variation, $pluginPrice, $merchantPrice);
+                $unitPrice = $pricing['unit_price'];
                 $totalPrice = $unitPrice * $quantity;
 
                 $computedSubtotal += $totalPrice;
 
-                $orderItemsPayload[] = [
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'product_sku' => $item['sku'] ?? $product->sku,
+                $normalizedItems[] = [
+                    'product' => $product,
+                    'variation' => $variation,
                     'quantity' => $quantity,
+                    'provided_sku' => $item['sku'] ?? null,
                     'unit_price' => $unitPrice,
-                    'total_price' => $totalPrice,
-                    'product_data' => [
-                        'description' => $product->description,
-                        'images' => $product->images,
-                    ],
+                    'item_total' => $totalPrice,
+                    'pricing' => $pricing,
                 ];
             }
 
@@ -212,15 +233,56 @@ class PluginOrderController extends Controller
                 'notes' => $data['notes'] ?? null,
             ]);
 
-            $order->items()->createMany($orderItemsPayload);
-            foreach ($orderItemsPayload as $itemPayload) {
-                $product = $products->get($itemPayload['product_id']);
-                if ($product) {
-                    $quantityToDecrement = (float) $itemPayload['quantity'];
-                    if ($quantityToDecrement > 0) {
-                        $product->decrement('stock_quantity', $quantityToDecrement);
-                    }
+            $productsToRefresh = [];
+
+            foreach ($normalizedItems as $itemData) {
+                /** @var Product $product */
+                $product = $itemData['product'];
+                /** @var ProductVariation|null $variation */
+                $variation = $itemData['variation'];
+                $quantity = $itemData['quantity'];
+                $unitPrice = $itemData['unit_price'];
+                $itemTotal = $itemData['item_total'];
+                $providedSku = $itemData['provided_sku'];
+                $pricing = $itemData['pricing'];
+
+                $productSku = $providedSku ?? ($variation?->sku ?? $product->sku);
+
+                $productData = [
+                    'description' => $product->description,
+                    'images' => $product->images,
+                    'pricing' => $pricing,
+                ];
+
+                if ($variation) {
+                    $productData['variation'] = [
+                        'id' => $variation->id,
+                        'sku' => $variation->sku,
+                        'attributes' => $variation->attributes,
+                        'image' => $variation->image,
+                    ];
                 }
+
+                $order->items()->create([
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'product_sku' => $productSku,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $itemTotal,
+                    'product_data' => $productData,
+                ]);
+
+                $product->decrement('stock_quantity', $quantity);
+                if ($variation && $variation->inventory !== null) {
+                    $variation->decrement('inventory', $quantity);
+                }
+
+                $productsToRefresh[$product->id] = $product;
+            }
+
+            foreach ($productsToRefresh as $productToRefresh) {
+                $this->refreshProductVariationsSnapshot($productToRefresh);
             }
 
             DB::commit();
@@ -535,5 +597,79 @@ class PluginOrderController extends Controller
         }
 
         return null;
+    }
+
+    protected function determinePluginUnitPrice(
+        Product $product,
+        ?ProductVariation $variation,
+        ?float $pluginPrice,
+        ?float $merchantPrice
+    ): array {
+        $productPrice = max(0, (float) $product->getCurrentPrice());
+
+        if ($pluginPrice !== null && $pluginPrice < 0) {
+            $pluginPrice = null;
+        }
+
+        if ($merchantPrice !== null && $merchantPrice < 0) {
+            $merchantPrice = null;
+        }
+
+        $basePrice = $pluginPrice ?? $merchantPrice ?? $productPrice;
+
+        $variationPrice = null;
+        if ($variation && $variation->price !== null && is_numeric($variation->price)) {
+            $candidate = (float) $variation->price;
+            if ($candidate >= 0) {
+                $variationPrice = $candidate;
+            }
+        }
+
+        $unitPrice = $basePrice;
+        if ($variationPrice !== null && $variationPrice < $basePrice) {
+            $unitPrice = $variationPrice;
+        }
+
+        $unitPrice = round($unitPrice, 2);
+        $productPrice = round($productPrice, 2);
+        if ($pluginPrice !== null) {
+            $pluginPrice = round($pluginPrice, 2);
+        }
+        if ($merchantPrice !== null) {
+            $merchantPrice = round($merchantPrice, 2);
+        }
+        if ($variationPrice !== null) {
+            $variationPrice = round($variationPrice, 2);
+        }
+
+        return [
+            'unit_price' => $unitPrice,
+            'product_price' => $productPrice,
+            'plugin_price' => $pluginPrice,
+            'merchant_price' => $merchantPrice,
+            'variation_price' => $variationPrice,
+        ];
+    }
+
+    protected function refreshProductVariationsSnapshot(Product $product): void
+    {
+        $collection = $product->productVariations()->orderBy('id')->get();
+
+        $snapshot = $collection->map(function (ProductVariation $variation) {
+            return [
+                'id' => $variation->id,
+                'sku' => $variation->sku,
+                'inventory' => (int) $variation->inventory,
+                'price' => $variation->price !== null ? (float) $variation->price : null,
+                'attributes' => $variation->attributes ?? [],
+                'image' => $variation->image,
+            ];
+        })->values()->toArray();
+
+        $product->forceFill([
+            'variations' => $snapshot,
+        ])->save();
+
+        $product->setRelation('productVariations', $collection);
     }
 }
