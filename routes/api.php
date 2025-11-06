@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\PluginSiteController;
 use App\Http\Controllers\Api\PluginOrderController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
+use App\Http\Controllers\Api\DiscountController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -130,6 +131,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         ->whereNumber('customer');
     Route::patch('/merchant/customers/{customer}', [MerchantCustomerController::class, 'update'])
         ->whereNumber('customer');
+
+    Route::apiResource('discounts', DiscountController::class);
 });
 
 Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {

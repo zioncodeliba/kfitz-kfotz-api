@@ -9,8 +9,9 @@ use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\ShippingCarrier;
 use App\Models\Shipment;
-use App\Models\Merchant;
 use App\Models\User;
+use App\Models\Discount;
+use App\Models\Merchant;
 use App\Services\ShippingSettingsService;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
@@ -23,6 +24,9 @@ class OrderController extends Controller
     use ApiResponse;
 
     protected array $agentMerchantCache = [];
+    protected array $productQuantityDiscountCache = [];
+    protected array $storewideDiscountCache = [];
+    protected array $merchantSpecificDiscountCache = [];
 
     public function __construct(
         protected ShippingSettingsService $shippingSettingsService
@@ -241,13 +245,17 @@ class OrderController extends Controller
 
             $rawItems = $data['items'];
             $normalizedItems = [];
-            $subtotal = 0;
+            $subtotal = 0.0;
+            $benefitTotal = 0.0;
+            $grossPaidSubtotal = 0.0;
+            $storewideDiscountTotal = 0.0;
+            $merchantDiscountTotal = 0.0;
 
             foreach ($rawItems as $item) {
                 $productId = (int) $item['product_id'];
                 $quantity = (int) $item['quantity'];
 
-                $product = Product::with('productVariations')->findOrFail($productId);
+                $product = Product::with(['productVariations', 'category'])->findOrFail($productId);
 
                 if ($product->stock_quantity < $quantity) {
                     return $this->errorResponse("Insufficient stock for product: {$product->name}", 400);
@@ -272,32 +280,106 @@ class OrderController extends Controller
                 }
 
                 $pricing = $this->determineUnitPrice($product, $variation, $merchantId);
-                $unitPrice = $pricing['unit_price'];
-                $itemTotal = $unitPrice * $quantity;
+                $baseUnitPrice = $pricing['unit_price'];
 
-                $subtotal += $itemTotal;
+                $merchantDiscount = $this->applyMerchantSpecificDiscount($product, $merchantId, $baseUnitPrice);
+                $storewideDiscount = $this->applyStorewideDiscount($product, $merchantId, $baseUnitPrice);
+
+                $unitPrice = $baseUnitPrice;
+                $appliedDiscountType = 'none';
+
+                if ($merchantDiscount['applied'] && $merchantDiscount['unit_price'] < $unitPrice) {
+                    $unitPrice = $merchantDiscount['unit_price'];
+                    $appliedDiscountType = 'merchant';
+                }
+
+                if ($storewideDiscount['applied'] && $storewideDiscount['unit_price'] < $unitPrice) {
+                    $unitPrice = $storewideDiscount['unit_price'];
+                    $appliedDiscountType = 'storewide';
+                }
+
+                $pricing['base_unit_price'] = $baseUnitPrice;
+                $pricing['unit_price'] = $unitPrice;
+                $pricing['applied_discount_type'] = $appliedDiscountType;
+                $pricing['merchant_discount'] = $merchantDiscount;
+                $pricing['storewide_discount'] = $storewideDiscount;
+
+                $quantityDiscount = $this->calculateQuantityDiscount($product, $quantity, $unitPrice);
+                $chargedQuantity = $quantityDiscount['charged_quantity'];
+                $freeUnits = $quantityDiscount['free_units'];
+                $deliveredQuantity = $quantityDiscount['delivered_units'];
+
+                $lineGrossPaid = round($baseUnitPrice * $chargedQuantity, 2);
+                $lineNetTotal = round($unitPrice * $chargedQuantity, 2);
+                $benefitValue = round($quantityDiscount['benefit_value'], 2);
+
+                $lineStorewideDiscount = 0.0;
+                $lineMerchantDiscount = 0.0;
+
+                if ($appliedDiscountType === 'storewide') {
+                    $lineStorewideDiscount = round(($baseUnitPrice - $unitPrice) * $chargedQuantity, 2);
+                } elseif ($appliedDiscountType === 'merchant') {
+                    $lineMerchantDiscount = round(($baseUnitPrice - $unitPrice) * $chargedQuantity, 2);
+                }
+
+                $subtotal += $lineNetTotal;
+                $benefitTotal += $benefitValue;
+                $grossPaidSubtotal += $lineGrossPaid;
+                $storewideDiscountTotal += $lineStorewideDiscount;
+                $merchantDiscountTotal += $lineMerchantDiscount;
+
+                $pricing['original_line_total'] = $lineGrossPaid;
+                $pricing['net_line_total'] = $lineNetTotal;
+                $pricing['charged_quantity'] = $chargedQuantity;
+                $pricing['delivered_quantity'] = $deliveredQuantity;
+                $pricing['discount_details'] = $quantityDiscount;
+                $pricing['storewide_discount_total'] = $lineStorewideDiscount;
+                $pricing['merchant_discount_total'] = $lineMerchantDiscount;
+                $pricing['benefit_value'] = $benefitValue;
+
+                $storewideWithTotal = $storewideDiscount;
+                $storewideWithTotal['total'] = $lineStorewideDiscount;
+
+                $merchantWithTotal = $merchantDiscount;
+                $merchantWithTotal['total'] = $lineMerchantDiscount;
 
                 $normalizedItems[] = [
                     'product' => $product,
                     'variation' => $variation,
-                    'quantity' => $quantity,
+                    'charged_quantity' => $chargedQuantity,
+                    'delivered_quantity' => $deliveredQuantity,
+                    'free_units' => $freeUnits,
                     'unit_price' => $unitPrice,
-                    'item_total' => $itemTotal,
+                    'base_unit_price' => $baseUnitPrice,
+                    'discount_details' => $quantityDiscount,
+                    'storewide_discount' => $storewideWithTotal,
+                    'storewide_discount_total' => $lineStorewideDiscount,
+                    'merchant_discount' => $merchantWithTotal,
+                    'merchant_discount_total' => $lineMerchantDiscount,
+                    'benefit_value' => $benefitValue,
+                    'line_total' => $lineNetTotal,
+                    'original_line_total' => $lineGrossPaid,
                     'pricing' => $pricing,
                 ];
             }
 
+            $subtotal = round($subtotal, 2);
+            $benefitTotal = round($benefitTotal, 2);
+            $grossPaidSubtotal = round($grossPaidSubtotal, 2);
+            $storewideDiscountTotal = round($storewideDiscountTotal, 2);
+
             // Calculate totals
-            $tax = $subtotal * 0.17; // 17% VAT
+            $tax = round($subtotal * 0.17, 2); // 17% VAT
             if ($data['shipping_type'] === 'pickup') {
-                $shippingCost = 0;
+                $shippingCost = 0.0;
             } elseif (array_key_exists('shipping_cost', $data) && $data['shipping_cost'] !== null) {
                 $shippingCost = max(0, (float) $data['shipping_cost']);
             } else {
-                $shippingCost = 30; // Basic default shipping cost
+                $shippingCost = 30.0; // Basic default shipping cost
             }
-            $discount = 0; // Can be calculated based on discounts
-            $total = $subtotal + $tax + $shippingCost - $discount;
+            $shippingCost = round($shippingCost, 2);
+            $discount = 0.0;
+            $total = round($subtotal + $tax + $shippingCost, 2);
 
             $source = $data['source'] ?? null;
             $sourceMetadata = $data['source_metadata'] ?? [];
@@ -328,12 +410,25 @@ class OrderController extends Controller
                 $source = 'system';
             }
 
+            $pricingSummary = [
+                'gross_paid_subtotal' => $grossPaidSubtotal,
+                'storewide_discount_total' => $storewideDiscountTotal,
+                'merchant_discount_total' => $merchantDiscountTotal,
+                'net_subtotal' => $subtotal,
+                'tax' => $tax,
+                'shipping_cost' => $shippingCost,
+                'total' => $total,
+                'benefit_value' => $benefitTotal,
+                'total_value_with_benefits' => round($grossPaidSubtotal + $benefitTotal, 2),
+            ];
+
             $sourceMetadata = array_merge([
                 'initiator' => [
                     'id' => $user->id,
                     'name' => $user->name,
                     'role' => $user->role,
                 ],
+                'pricing_summary' => $pricingSummary,
             ], $sourceMetadata);
 
             // Create order
@@ -371,10 +466,13 @@ class OrderController extends Controller
                 $product = $itemData['product'];
                 /** @var ProductVariation|null $variation */
                 $variation = $itemData['variation'];
-                $quantity = $itemData['quantity'];
+                $chargedQuantity = $itemData['charged_quantity'];
+                $deliveredQuantity = $itemData['delivered_quantity'];
+                $freeUnits = $itemData['free_units'];
                 $unitPrice = $itemData['unit_price'];
-                $itemTotal = $itemData['item_total'];
+                $itemTotal = $itemData['line_total'];
                 $pricing = $itemData['pricing'];
+                $benefitValue = $itemData['benefit_value'];
 
                 $productSku = $product->sku;
                 if ($variation && $variation->sku) {
@@ -386,6 +484,21 @@ class OrderController extends Controller
                     'images' => $product->images,
                     'pricing' => $pricing,
                 ];
+
+                $discountDetails = $itemData['discount_details'] ?? null;
+
+                $productData['discount'] = $discountDetails;
+                $productData['quantity_summary'] = [
+                    'ordered' => $chargedQuantity,
+                    'charged' => $chargedQuantity,
+                    'free_units' => $freeUnits,
+                    'delivered' => $deliveredQuantity,
+                ];
+                $productData['benefit_value'] = $benefitValue;
+                $productData['storewide_discount'] = $itemData['storewide_discount'] ?? null;
+                $productData['storewide_discount_total'] = $itemData['storewide_discount_total'] ?? 0.0;
+                $productData['merchant_discount'] = $itemData['merchant_discount'] ?? null;
+                $productData['merchant_discount_total'] = $itemData['merchant_discount_total'] ?? 0.0;
 
                 if ($variation) {
                     $productData['variation'] = [
@@ -400,16 +513,16 @@ class OrderController extends Controller
                     'product_id' => $product->id,
                     'product_name' => $product->name,
                     'product_sku' => $productSku,
-                    'quantity' => $quantity,
+                    'quantity' => $deliveredQuantity,
                     'unit_price' => $unitPrice,
                     'total_price' => $itemTotal,
                     'product_data' => $productData,
                 ]);
 
                 // Update stock
-                $product->decrement('stock_quantity', $quantity);
+                $product->decrement('stock_quantity', $deliveredQuantity);
                 if ($variation && $variation->inventory !== null) {
-                    $variation->decrement('inventory', $quantity);
+                    $variation->decrement('inventory', $deliveredQuantity);
                 }
 
                 $productsToRefresh[$product->id] = $product;
@@ -515,6 +628,363 @@ class OrderController extends Controller
             'product_price' => $productPrice,
             'merchant_price' => $merchantPrice,
             'variation_price' => $variationPrice,
+        ];
+    }
+
+    protected function getActiveQuantityDiscountForProduct(int $productId): ?Discount
+    {
+        if (array_key_exists($productId, $this->productQuantityDiscountCache)) {
+            return $this->productQuantityDiscountCache[$productId];
+        }
+
+        $today = now()->toDateString();
+
+        $discount = Discount::query()
+            ->where('type', Discount::TYPE_QUANTITY)
+            ->where('product_id', $productId)
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->orderByDesc('start_date')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($discount) {
+            $status = $discount->computeStatus();
+            if ($status === Discount::STATUS_EXPIRED) {
+                $discount = null;
+            } elseif ((int) $discount->buy_quantity <= 0 || (int) $discount->get_quantity <= 0) {
+                $discount = null;
+            }
+        }
+
+        $this->productQuantityDiscountCache[$productId] = $discount;
+
+        return $discount;
+    }
+
+    protected function calculateQuantityDiscount(Product $product, int $quantity, float $unitPrice): array
+    {
+        $quantity = max(0, $quantity);
+        $unitPrice = max(0.0, $unitPrice);
+
+        $default = [
+            'applied' => false,
+            'discount_id' => null,
+            'type' => null,
+            'name' => null,
+            'buy_quantity' => null,
+            'get_quantity' => null,
+            'free_per_bundle' => 0,
+            'eligible_bundles' => 0,
+            'free_units' => 0,
+            'charged_quantity' => $quantity,
+            'benefit_value' => 0.0,
+            'delivered_units' => $quantity,
+            'status' => null,
+            'valid_from' => null,
+            'valid_until' => null,
+        ];
+
+        if ($quantity <= 0 || $unitPrice <= 0) {
+            return $default;
+        }
+
+        $discount = $this->getActiveQuantityDiscountForProduct($product->id);
+
+        if (!$discount) {
+            return $default;
+        }
+
+        $buyQuantity = (int) $discount->buy_quantity;
+        $getQuantity = (int) $discount->get_quantity;
+
+        if ($buyQuantity <= 0 || $getQuantity <= 0) {
+            return $default;
+        }
+
+        $eligibleBundles = intdiv($quantity, $buyQuantity);
+        $freePerBundle = max($getQuantity - $buyQuantity, 0);
+        $freeUnits = $eligibleBundles * $freePerBundle;
+        $chargedQuantity = $quantity;
+        $benefitValue = round($freeUnits * $unitPrice, 2);
+        $deliveredFromBundles = $eligibleBundles * $getQuantity;
+        $remainingCharged = $quantity - ($eligibleBundles * $buyQuantity);
+        $deliveredUnits = $deliveredFromBundles + $remainingCharged;
+
+        return [
+            'applied' => $freeUnits > 0,
+            'discount_id' => $discount->id,
+            'type' => $discount->type,
+            'name' => $discount->name,
+            'buy_quantity' => $buyQuantity,
+            'get_quantity' => $getQuantity,
+            'free_per_bundle' => $freePerBundle,
+            'eligible_bundles' => $eligibleBundles,
+            'free_units' => $freeUnits,
+            'charged_quantity' => $chargedQuantity,
+            'benefit_value' => $benefitValue,
+            'delivered_units' => $deliveredUnits,
+            'status' => $discount->computeStatus(),
+            'valid_from' => $discount->start_date?->toDateString(),
+            'valid_until' => $discount->end_date?->toDateString(),
+        ];
+    }
+
+    protected function findMerchantSpecificDiscount(Product $product, ?int $merchantUserId): ?Discount
+    {
+        if (!$merchantUserId) {
+            return null;
+        }
+
+        $cacheKey = implode(':', [
+            $merchantUserId,
+            $product->id,
+            $product->category_id ?? 'null',
+        ]);
+
+        if (array_key_exists($cacheKey, $this->merchantSpecificDiscountCache)) {
+            return $this->merchantSpecificDiscountCache[$cacheKey];
+        }
+
+        $today = now()->toDateString();
+
+        $query = Discount::query()
+            ->where('type', Discount::TYPE_MERCHANT)
+            ->where('target_merchant_id', $merchantUserId)
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->whereNotNull('discount_percentage')
+            ->where(function ($scopeQuery) use ($product) {
+                $scopeQuery->where(function ($storeScope) {
+                    $storeScope->whereNull('apply_scope')
+                        ->orWhere('apply_scope', Discount::SCOPE_STORE);
+                });
+
+                $scopeQuery->orWhere(function ($productScope) use ($product) {
+                    $productScope->where('apply_scope', Discount::SCOPE_PRODUCT)
+                        ->where('product_id', $product->id);
+                });
+
+                if ($product->category_id) {
+                    $categoryId = $product->category_id;
+                    $scopeQuery->orWhere(function ($categoryScope) use ($categoryId) {
+                        $categoryScope->where('apply_scope', Discount::SCOPE_CATEGORY)
+                            ->where('category_id', $categoryId);
+                    });
+                }
+            })
+            ->orderByDesc(DB::raw(sprintf(
+                "CASE WHEN apply_scope = '%s' THEN 3 WHEN apply_scope = '%s' THEN 2 ELSE 1 END",
+                Discount::SCOPE_PRODUCT,
+                Discount::SCOPE_CATEGORY
+            )))
+            ->orderByDesc('discount_percentage')
+            ->orderByDesc('created_at');
+
+        $discount = $query->first();
+
+        if ($discount) {
+            $status = $discount->computeStatus();
+            if ($status === Discount::STATUS_EXPIRED) {
+                $discount = null;
+            }
+        }
+
+        $this->merchantSpecificDiscountCache[$cacheKey] = $discount;
+
+        return $discount;
+    }
+
+    protected function applyMerchantSpecificDiscount(
+        Product $product,
+        ?int $merchantUserId,
+        float $unitPrice
+    ): array {
+        $unitPrice = max(0.0, $unitPrice);
+        $originalUnitPrice = round($unitPrice, 2);
+
+        $default = [
+            'applied' => false,
+            'unit_price' => $originalUnitPrice,
+            'original_unit_price' => $originalUnitPrice,
+            'discount_per_unit' => 0.0,
+            'percentage' => 0.0,
+            'discount_id' => null,
+            'apply_scope' => null,
+            'name' => null,
+            'product_id' => null,
+            'category_id' => null,
+            'target_merchant_id' => null,
+            'start_date' => null,
+            'end_date' => null,
+        ];
+
+        $discount = $this->findMerchantSpecificDiscount($product, $merchantUserId);
+
+        if (!$discount || $discount->discount_percentage === null) {
+            return $default;
+        }
+
+        $percentage = (float) $discount->discount_percentage;
+        if ($percentage <= 0) {
+            return $default;
+        }
+        $percentage = min($percentage, 100);
+
+        $discountedPrice = round($unitPrice * (1 - ($percentage / 100)), 2);
+        if ($discountedPrice < 0) {
+            $discountedPrice = 0.0;
+        }
+
+        $discountPerUnit = round($originalUnitPrice - $discountedPrice, 2);
+        if ($discountPerUnit <= 0) {
+            return $default;
+        }
+
+        return [
+            'applied' => true,
+            'unit_price' => $discountedPrice,
+            'original_unit_price' => $originalUnitPrice,
+            'discount_per_unit' => $discountPerUnit,
+            'percentage' => $percentage,
+            'discount_id' => $discount->id,
+            'apply_scope' => $discount->apply_scope ?? Discount::SCOPE_STORE,
+            'name' => $discount->name,
+            'product_id' => $discount->product_id,
+            'category_id' => $discount->category_id,
+            'target_merchant_id' => $discount->target_merchant_id,
+            'start_date' => $discount->start_date?->toDateString(),
+            'end_date' => $discount->end_date?->toDateString(),
+        ];
+    }
+
+    protected function findStorewideDiscount(Product $product, ?int $merchantUserId): ?Discount
+    {
+        $cacheKey = implode(':', [
+            $merchantUserId ?? 'null',
+            $product->id,
+            $product->category_id ?? 'null',
+        ]);
+
+        if (array_key_exists($cacheKey, $this->storewideDiscountCache)) {
+            return $this->storewideDiscountCache[$cacheKey];
+        }
+
+        $today = now()->toDateString();
+
+        $query = Discount::query()
+            ->where('type', Discount::TYPE_STOREWIDE)
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->whereNotNull('discount_percentage')
+            ->where(function ($targetQuery) use ($merchantUserId) {
+                $targetQuery->whereNull('target_merchant_id');
+
+                if ($merchantUserId) {
+                    $targetQuery->orWhere('target_merchant_id', $merchantUserId);
+                }
+            })
+            ->where(function ($scopeQuery) use ($product) {
+                $scopeQuery->where(function ($storeScope) {
+                    $storeScope->whereNull('apply_scope')
+                        ->orWhere('apply_scope', Discount::SCOPE_STORE);
+                });
+
+                $scopeQuery->orWhere(function ($productScope) use ($product) {
+                    $productScope->where('apply_scope', Discount::SCOPE_PRODUCT)
+                        ->where('product_id', $product->id);
+                });
+
+                if ($product->category_id) {
+                    $categoryId = $product->category_id;
+                    $scopeQuery->orWhere(function ($categoryScope) use ($categoryId) {
+                        $categoryScope->where('apply_scope', Discount::SCOPE_CATEGORY)
+                            ->where('category_id', $categoryId);
+                    });
+                }
+            })
+            ->orderByDesc(DB::raw(sprintf(
+                "CASE WHEN apply_scope = '%s' THEN 3 WHEN apply_scope = '%s' THEN 2 ELSE 1 END",
+                Discount::SCOPE_PRODUCT,
+                Discount::SCOPE_CATEGORY
+            )))
+            ->orderByDesc('discount_percentage')
+            ->orderByDesc('created_at');
+
+        $discount = $query->first();
+
+        if ($discount) {
+            $status = $discount->computeStatus();
+            if ($status === Discount::STATUS_EXPIRED) {
+                $discount = null;
+            }
+        }
+
+        $this->storewideDiscountCache[$cacheKey] = $discount;
+
+        return $discount;
+    }
+
+    protected function applyStorewideDiscount(
+        Product $product,
+        ?int $merchantUserId,
+        float $unitPrice
+    ): array {
+        $unitPrice = max(0.0, $unitPrice);
+        $originalUnitPrice = round($unitPrice, 2);
+
+        $default = [
+            'applied' => false,
+            'unit_price' => $originalUnitPrice,
+            'original_unit_price' => $originalUnitPrice,
+            'discount_per_unit' => 0.0,
+            'percentage' => 0.0,
+            'discount_id' => null,
+            'apply_scope' => null,
+            'name' => null,
+            'product_id' => null,
+            'category_id' => null,
+            'target_merchant_id' => null,
+            'start_date' => null,
+            'end_date' => null,
+        ];
+
+        $discount = $this->findStorewideDiscount($product, $merchantUserId);
+
+        if (!$discount || $discount->discount_percentage === null) {
+            return $default;
+        }
+
+        $percentage = (float) $discount->discount_percentage;
+        if ($percentage <= 0) {
+            return $default;
+        }
+        $percentage = min($percentage, 100);
+
+        $discountedPrice = round($unitPrice * (1 - ($percentage / 100)), 2);
+        if ($discountedPrice < 0) {
+            $discountedPrice = 0.0;
+        }
+
+        $discountPerUnit = round($originalUnitPrice - $discountedPrice, 2);
+        if ($discountPerUnit <= 0) {
+            return $default;
+        }
+
+        return [
+            'applied' => true,
+            'unit_price' => $discountedPrice,
+            'original_unit_price' => $originalUnitPrice,
+            'discount_per_unit' => $discountPerUnit,
+            'percentage' => $percentage,
+            'discount_id' => $discount->id,
+            'apply_scope' => $discount->apply_scope ?? Discount::SCOPE_STORE,
+            'name' => $discount->name,
+            'product_id' => $discount->product_id,
+            'category_id' => $discount->category_id,
+            'target_merchant_id' => $discount->target_merchant_id,
+            'start_date' => $discount->start_date?->toDateString(),
+            'end_date' => $discount->end_date?->toDateString(),
         ];
     }
 
