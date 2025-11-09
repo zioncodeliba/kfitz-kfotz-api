@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class MerchantCustomerController extends Controller
 {
@@ -104,6 +107,126 @@ class MerchantCustomerController extends Controller
         return $this->successResponse($response);
     }
 
+    public function store(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->hasRole('merchant') && !$user->hasRole('admin')) {
+            return $this->forbiddenResponse('Insufficient permissions');
+        }
+
+        $validated = $request->validate([
+            'merchant_user_id' => $user->hasRole('admin') ? 'required|integer|exists:users,id' : 'nullable',
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'required|string|max:50',
+            'notes' => 'nullable|string',
+            'address' => 'nullable|array',
+            'address.line1' => 'nullable|string|max:255',
+            'address.line2' => 'nullable|string|max:255',
+            'address.city' => 'nullable|string|max:255',
+            'address.state' => 'nullable|string|max:255',
+            'address.zip' => 'nullable|string|max:50',
+            'address.country' => 'nullable|string|max:255',
+        ]);
+
+        $merchantUserId = $user->hasRole('merchant')
+            ? $user->id
+            : (int) ($validated['merchant_user_id'] ?? 0);
+
+        if ($merchantUserId <= 0) {
+            return $this->validationErrorResponse([
+                'merchant_user_id' => ['Unable to resolve merchant user id'],
+            ]);
+        }
+
+        $customer = $this->upsertMerchantCustomer(
+            $merchantUserId,
+            Arr::only($validated, ['name', 'email', 'phone', 'notes', 'address'])
+        );
+
+        $customer->loadCount('orders')
+            ->loadSum('orders as total_spent', 'total');
+
+        return $this->successResponse(
+            [
+                'customer' => $this->transformCustomerDetail($customer, []),
+            ],
+            'Customer created successfully'
+        );
+    }
+
+    public function import(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->hasRole('merchant') && !$user->hasRole('admin')) {
+            return $this->forbiddenResponse('Insufficient permissions');
+        }
+
+        $validated = $request->validate([
+            'merchant_user_id' => $user->hasRole('admin') ? 'required|integer|exists:users,id' : 'nullable',
+            'file' => 'required|file|mimes:csv,txt,xls,xlsx',
+        ]);
+
+        $merchantUserId = $user->hasRole('merchant')
+            ? $user->id
+            : (int) ($validated['merchant_user_id'] ?? 0);
+
+        if ($merchantUserId <= 0) {
+            return $this->validationErrorResponse([
+                'merchant_user_id' => ['Unable to resolve merchant user id'],
+            ]);
+        }
+
+        /** @var UploadedFile $file */
+        $file = $validated['file'];
+
+        try {
+            $rows = $this->extractCustomerRowsFromFile($file);
+        } catch (\Throwable $exception) {
+            return $this->errorResponse('Failed to parse the uploaded file: ' . $exception->getMessage(), 422);
+        }
+
+        if (empty($rows)) {
+            return $this->errorResponse('לא נמצאו נתונים שניתן לייבא בקובץ שסופק', 422);
+        }
+
+        $summary = [
+            'total_rows' => count($rows),
+            'imported' => 0,
+            'skipped' => 0,
+            'errors' => [],
+        ];
+
+        foreach ($rows as $row) {
+            $line = $row['_line'] ?? null;
+            $data = $row['data'] ?? [];
+
+            $name = trim((string) ($data['name'] ?? ''));
+            $phone = trim((string) ($data['phone'] ?? ''));
+
+            if ($name === '' || $phone === '') {
+                $summary['skipped']++;
+                $summary['errors'][] = $this->buildRowError($line, 'שם וטלפון הם שדות חובה');
+                continue;
+            }
+
+            try {
+                $this->upsertMerchantCustomer($merchantUserId, $data);
+                $summary['imported']++;
+            } catch (\Throwable $exception) {
+                $summary['skipped']++;
+                $summary['errors'][] = $this->buildRowError(
+                    $line,
+                    $exception->getMessage() ?: 'שגיאה בעת שמירת הלקוח'
+                );
+            }
+        }
+
+        return $this->successResponse($summary, 'Customers imported successfully');
+    }
+
     public function update(Request $request, MerchantCustomer $customer)
     {
         $user = $request->user();
@@ -150,6 +273,313 @@ class MerchantCustomerController extends Controller
         return $this->successResponse([
             'customer' => $this->transformCustomerDetail($customer, $orders->all()),
         ], 'Customer updated successfully');
+    }
+
+    protected function upsertMerchantCustomer(int $merchantUserId, array $customerData): MerchantCustomer
+    {
+        $name = trim((string) ($customerData['name'] ?? ''));
+        if ($name === '') {
+            throw new \InvalidArgumentException('Customer name is required');
+        }
+
+        $email = isset($customerData['email']) ? strtolower(trim((string) $customerData['email'])) : null;
+        $email = $email === '' ? null : $email;
+
+        $phone = $this->normalizePhone($customerData['phone'] ?? null);
+
+        if (!$email && !$phone) {
+            throw new \InvalidArgumentException('Customer phone or email is required');
+        }
+
+        $query = MerchantCustomer::where('merchant_user_id', $merchantUserId);
+
+        if ($email && $phone) {
+            $query->where('email', $email)->where('phone', $phone);
+        } elseif ($email) {
+            $query->where('email', $email);
+        } elseif ($phone) {
+            $query->where('phone', $phone);
+        }
+
+        $payload = [
+            'merchant_user_id' => $merchantUserId,
+            'name' => $name,
+            'email' => $email,
+            'phone' => $phone,
+            'notes' => $customerData['notes'] ?? null,
+            'address' => $this->normalizeAddressPayload($customerData['address'] ?? null),
+        ];
+
+        $existingCustomer = $query->first();
+
+        if ($existingCustomer) {
+            $updates = [];
+
+            foreach (['name', 'email', 'phone'] as $attribute) {
+                $value = $payload[$attribute];
+                if ($value !== null && $existingCustomer->{$attribute} !== $value) {
+                    $updates[$attribute] = $value;
+                }
+            }
+
+            if (isset($payload['notes']) && $payload['notes'] !== null && $existingCustomer->notes !== $payload['notes']) {
+                $updates['notes'] = $payload['notes'];
+            }
+
+            if ($payload['address'] !== null && $existingCustomer->address != $payload['address']) {
+                $updates['address'] = $payload['address'];
+            }
+
+            if (!empty($updates)) {
+                $existingCustomer->fill($updates)->save();
+            }
+
+            return $existingCustomer->refresh();
+        }
+
+        return MerchantCustomer::create($payload);
+    }
+
+    protected function extractCustomerRowsFromFile(UploadedFile $file): array
+    {
+        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
+        $path = $file->getRealPath();
+
+        if (!$path) {
+            throw new \RuntimeException('Unable to read the uploaded file');
+        }
+
+        if (in_array($extension, ['csv', 'txt'])) {
+            return $this->parseCsvFile($path);
+        }
+
+        return $this->parseSpreadsheetFile($path);
+    }
+
+    protected function parseCsvFile(string $path): array
+    {
+        $handle = fopen($path, 'r');
+
+        if (!$handle) {
+            throw new \RuntimeException('Unable to open the uploaded file');
+        }
+
+        $rows = [];
+        $headerMap = null;
+        $lineNumber = 0;
+
+        while (($row = fgetcsv($handle, 0, ',')) !== false) {
+            $lineNumber++;
+
+            if ($lineNumber === 1) {
+                $headerMap = $this->mapHeaders($row);
+                continue;
+            }
+
+            if (!$headerMap) {
+                continue;
+            }
+
+            $mapped = $this->mapRowToCustomer($headerMap, $row);
+
+            if ($this->rowIsEmpty($mapped)) {
+                continue;
+            }
+
+            $rows[] = [
+                '_line' => $lineNumber,
+                'data' => $mapped,
+            ];
+        }
+
+        fclose($handle);
+
+        return $rows;
+    }
+
+    protected function parseSpreadsheetFile(string $path): array
+    {
+        $spreadsheet = IOFactory::load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $rows = [];
+        $headerMap = null;
+        $highestRow = $sheet->getHighestDataRow();
+        $highestColumn = $sheet->getHighestDataColumn();
+
+        for ($rowIndex = 1; $rowIndex <= $highestRow; $rowIndex++) {
+            $row = $sheet->rangeToArray("A{$rowIndex}:{$highestColumn}{$rowIndex}", null, true, false)[0] ?? [];
+
+            if ($rowIndex === 1) {
+                $headerMap = $this->mapHeaders($row);
+                continue;
+            }
+
+            if (!$headerMap) {
+                continue;
+            }
+
+            $mapped = $this->mapRowToCustomer($headerMap, $row);
+
+            if ($this->rowIsEmpty($mapped)) {
+                continue;
+            }
+
+            $rows[] = [
+                '_line' => $rowIndex,
+                'data' => $mapped,
+            ];
+        }
+
+        return $rows;
+    }
+
+    protected function mapHeaders(array $rawHeaders): array
+    {
+        $mapped = [];
+
+        foreach ($rawHeaders as $header) {
+            $mapped[] = $this->normalizeHeaderKey($header);
+        }
+
+        return $mapped;
+    }
+
+    protected function mapRowToCustomer(array $headerMap, array $row): array
+    {
+        $data = [
+            'name' => null,
+            'email' => null,
+            'phone' => null,
+            'notes' => null,
+            'address' => [],
+        ];
+
+        foreach ($row as $index => $value) {
+            $key = $headerMap[$index] ?? null;
+
+            if (!$key) {
+                continue;
+            }
+
+            $stringValue = is_string($value) ? trim($value) : $value;
+            if ($stringValue === '' || $stringValue === null) {
+                continue;
+            }
+
+            if (Str::startsWith($key, 'address.')) {
+                $addressKey = Str::after($key, 'address.');
+                $data['address'][$addressKey] = $stringValue;
+                continue;
+            }
+
+            $data[$key] = $stringValue;
+        }
+
+        if (empty($data['address'])) {
+            unset($data['address']);
+        }
+
+        return $data;
+    }
+
+    protected function normalizeHeaderKey(?string $header): ?string
+    {
+        if ($header === null) {
+            return null;
+        }
+
+        $normalized = strtolower(trim((string) $header));
+        $normalized = str_replace([' ', '-', '.'], '_', $normalized);
+
+        $map = [
+            'name' => 'name',
+            'full_name' => 'name',
+            'customer_name' => 'name',
+            'email' => 'email',
+            'mail' => 'email',
+            'phone' => 'phone',
+            'phone_number' => 'phone',
+            'mobile' => 'phone',
+            'notes' => 'notes',
+            'note' => 'notes',
+            'comments' => 'notes',
+            'address' => 'address.line1',
+            'address_line1' => 'address.line1',
+            'line1' => 'address.line1',
+            'street' => 'address.line1',
+            'address_line2' => 'address.line2',
+            'line2' => 'address.line2',
+            'city' => 'address.city',
+            'town' => 'address.city',
+            'state' => 'address.state',
+            'region' => 'address.state',
+            'zip' => 'address.zip',
+            'postal_code' => 'address.zip',
+            'postcode' => 'address.zip',
+            'country' => 'address.country',
+        ];
+
+        return $map[$normalized] ?? null;
+    }
+
+    protected function rowIsEmpty(array $row): bool
+    {
+        $hasPrimaryField = collect(Arr::only($row, ['name', 'email', 'phone', 'notes']))
+            ->filter(fn ($value) => filled($value))
+            ->isNotEmpty();
+
+        if ($hasPrimaryField) {
+            return false;
+        }
+
+        if (!empty($row['address']) && is_array($row['address'])) {
+            return !collect($row['address'])->contains(fn ($value) => filled($value));
+        }
+
+        return true;
+    }
+
+    protected function normalizeAddressPayload($address): ?array
+    {
+        if (!is_array($address)) {
+            return null;
+        }
+
+        $fields = ['line1', 'line2', 'city', 'state', 'zip', 'country'];
+        $normalized = [];
+
+        foreach ($fields as $field) {
+            if (!array_key_exists($field, $address)) {
+                continue;
+            }
+
+            $value = trim((string) $address[$field]);
+            if ($value !== '') {
+                $normalized[$field] = $value;
+            }
+        }
+
+        return empty($normalized) ? null : $normalized;
+    }
+
+    protected function buildRowError(?int $line, string $message): array
+    {
+        return [
+            'line' => $line,
+            'message' => $message,
+        ];
+    }
+
+    protected function normalizePhone(?string $phone): ?string
+    {
+        if ($phone === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+
+        return $digits !== '' ? $digits : null;
     }
 
     protected function transformCustomerSummary(MerchantCustomer $customer): array

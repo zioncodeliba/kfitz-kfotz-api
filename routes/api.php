@@ -135,6 +135,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/merchants/{id}', [MerchantController::class, 'destroy']);
 
     Route::get('/merchant/customers', [MerchantCustomerController::class, 'index']);
+    Route::post('/merchant/customers', [MerchantCustomerController::class, 'store']);
+    Route::post('/merchant/customers/import', [MerchantCustomerController::class, 'import']);
     Route::get('/merchant/customers/{customer}', [MerchantCustomerController::class, 'show'])
         ->whereNumber('customer');
     Route::put('/merchant/customers/{customer}', [MerchantCustomerController::class, 'update'])
