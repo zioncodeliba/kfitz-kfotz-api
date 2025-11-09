@@ -15,6 +15,8 @@ use App\Http\Controllers\Api\PluginOrderController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
 use App\Http\Controllers\Api\DiscountController;
+use App\Http\Controllers\Api\EmailTemplateController;
+use App\Http\Controllers\Api\EmailLogController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -95,6 +97,14 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
     Route::get('/plugin-sites', [PluginSiteController::class, 'index']);
     Route::post('/plugin-sites', [PluginSiteController::class, 'store']);
+
+    // Mail center
+    Route::get('/email/templates', [EmailTemplateController::class, 'index']);
+    Route::get('/email/templates/{template}', [EmailTemplateController::class, 'show']);
+    Route::put('/email/templates/{template}', [EmailTemplateController::class, 'update']);
+    Route::post('/email/templates/{template}/send-test', [EmailTemplateController::class, 'sendTest']);
+    Route::get('/email/logs', [EmailLogController::class, 'index']);
+    Route::get('/email/logs/{log}', [EmailLogController::class, 'show']);
     
 });
 

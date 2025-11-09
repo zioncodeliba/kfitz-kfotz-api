@@ -11,10 +11,17 @@ use App\Models\MerchantSite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use App\Services\EmailTemplateService;
 
 class ProductController extends Controller
 {
     use ApiResponse;
+
+    public function __construct(
+        protected EmailTemplateService $emailTemplateService
+    ) {
+    }
 
     /**
      * Display a listing of the resource.
@@ -151,6 +158,7 @@ class ProductController extends Controller
     public function update(Request $request, string $id)
     {
         $product = Product::findOrFail($id);
+        $wasOutOfStock = $product->stock_quantity <= 0;
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -212,7 +220,42 @@ class ProductController extends Controller
 
         $product->load(['category', 'productVariations']);
 
+        if ($wasOutOfStock && $product->stock_quantity > 0) {
+            $this->notifyProductBackInStock($product);
+        }
+
         return $this->successResponse($product, 'Product updated successfully');
+    }
+
+    protected function notifyProductBackInStock(Product $product): void
+    {
+        try {
+            $product->loadMissing('category');
+            $payload = $this->buildProductBackInStockPayload($product);
+            $this->emailTemplateService->send('product.back_in_stock', $payload);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send product back in stock notification', [
+                'product_id' => $product->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function buildProductBackInStockPayload(Product $product): array
+    {
+        return [
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'stock_quantity' => $product->stock_quantity,
+                'min_stock_alert' => $product->min_stock_alert,
+                'price' => $product->price,
+            ],
+            'category' => [
+                'name' => optional($product->category)->name,
+            ],
+        ];
     }
 
     /**

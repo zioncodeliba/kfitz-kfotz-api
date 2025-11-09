@@ -83,8 +83,10 @@ class AuthController extends Controller
             return $this->notFoundResponse('User not found');
         }
         $token = app('auth.password.broker')->createToken($user);
+        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
+        $resetUrl = $frontendUrl . '/reset-password?token=' . urlencode($token) . '&email=' . urlencode($user->email);
         // שליחת מייל (פשוטה, אפשר להחליף ל־Notification)
-        \Mail::raw('Reset your password: ' . url('/reset-password?token=' . $token), function ($message) use ($user) {
+        \Mail::raw('Reset your password: ' . $resetUrl, function ($message) use ($user) {
             $message->to($user->email)->subject('Password Reset');
         });
         return $this->successResponse(null, 'Password reset email sent');

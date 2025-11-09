@@ -13,9 +13,11 @@ use App\Models\User;
 use App\Models\Discount;
 use App\Models\Merchant;
 use App\Services\ShippingSettingsService;
+use App\Services\EmailTemplateService;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
@@ -29,7 +31,8 @@ class OrderController extends Controller
     protected array $merchantSpecificDiscountCache = [];
 
     public function __construct(
-        protected ShippingSettingsService $shippingSettingsService
+        protected ShippingSettingsService $shippingSettingsService,
+        protected EmailTemplateService $emailTemplateService
     ) {
     }
 
@@ -538,7 +541,10 @@ class OrderController extends Controller
                 $merchantUser->refreshOrderFinancials();
             }
 
-            return $this->createdResponse($order->load(['items.product', 'user']), 'Order created successfully');
+            $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
+            $this->notifyOrderEvent($order, 'order.created');
+
+            return $this->createdResponse($order, 'Order created successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1102,6 +1108,8 @@ class OrderController extends Controller
             $updates['payment_status'] = $normalizedPaymentStatus;
         }
 
+        $previousStatus = $order->status;
+
         $order->update($updates);
 
         // Update timestamps based on status
@@ -1113,7 +1121,13 @@ class OrderController extends Controller
             }
         }
 
-        return $this->successResponse($order->load(['items.product', 'user']), 'Order updated successfully');
+        $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
+
+        if ($previousStatus !== Order::STATUS_SHIPPED && $order->status === Order::STATUS_SHIPPED) {
+            $this->notifyOrderEvent($order, 'order.shipped');
+        }
+
+        return $this->successResponse($order, 'Order updated successfully');
     }
 
     /**
@@ -2152,6 +2166,114 @@ class OrderController extends Controller
         }
 
         return $this->successResponse($response);
+    }
+
+    protected function notifyOrderEvent(Order $order, string $eventKey): void
+    {
+        try {
+            $payload = $this->buildOrderEmailPayload($order);
+            $recipientList = $this->resolveOrderRecipients($order);
+            $recipients = [];
+
+            if (!empty($recipientList)) {
+                $recipients['to'] = $recipientList;
+            }
+
+            $this->emailTemplateService->send($eventKey, $payload, $recipients);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send order email notification', [
+                'event_key' => $eventKey,
+                'order_id' => $order->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function buildOrderEmailPayload(Order $order): array
+    {
+        $order->loadMissing(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
+        $customerDetails = $this->resolveOrderCustomerDetails($order);
+
+        return [
+            'order' => [
+                'id' => $order->id,
+                'number' => $order->order_number,
+                'status' => $order->status,
+                'total' => $order->total,
+                'shipping_cost' => $order->shipping_cost,
+                'created_at' => optional($order->created_at)->toIso8601String(),
+            ],
+            'customer' => [
+                'name' => $customerDetails['name'],
+                'email' => $customerDetails['email'],
+                'phone' => data_get($order->shipping_address, 'phone')
+                    ?? data_get($order->billing_address, 'phone')
+                    ?? optional($order->merchantCustomer)->phone,
+            ],
+            'shipping' => [
+                'type' => $order->shipping_type,
+                'method' => $order->shipping_method,
+                'address' => $order->shipping_address,
+            ],
+            'shipment' => [
+                'carrier' => $order->shipping_company ?? optional($order->carrier)->name,
+                'tracking_number' => $order->tracking_number,
+                'shipped_at' => optional($order->shipped_at)->toIso8601String(),
+            ],
+            'merchant' => [
+                'name' => optional($order->merchant)->name,
+                'email' => optional($order->merchant)->email,
+            ],
+            'items' => $order->items->map(function ($item) {
+                return [
+                    'name' => $item->product_name,
+                    'sku' => $item->product_sku,
+                    'quantity' => $item->quantity,
+                    'unit_price' => $item->unit_price,
+                    'total_price' => $item->total_price,
+                ];
+            })->toArray(),
+        ];
+    }
+
+    protected function resolveOrderRecipients(Order $order): array
+    {
+        $customerDetails = $this->resolveOrderCustomerDetails($order);
+
+        if (!empty($customerDetails['email'])) {
+            return [[
+                'email' => $customerDetails['email'],
+                'name' => $customerDetails['name'],
+            ]];
+        }
+
+        if ($order->merchant && $order->merchant->email) {
+            return [[
+                'email' => $order->merchant->email,
+                'name' => $order->merchant->name,
+            ]];
+        }
+
+        return [];
+    }
+
+    protected function resolveOrderCustomerDetails(Order $order): array
+    {
+        $name = data_get($order->shipping_address, 'name')
+            ?? data_get($order->shipping_address, 'contact_name')
+            ?? data_get($order->billing_address, 'name')
+            ?? optional($order->merchantCustomer)->name
+            ?? optional($order->user)->name;
+
+        $email = data_get($order->shipping_address, 'email')
+            ?? data_get($order->billing_address, 'email')
+            ?? optional($order->merchantCustomer)->email
+            ?? optional($order->user)->email;
+
+        return [
+            'name' => $name,
+            'email' => $email,
+        ];
     }
 
     /**

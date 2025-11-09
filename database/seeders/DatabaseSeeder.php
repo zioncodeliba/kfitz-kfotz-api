@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             OrderAndShipmentSeeder::class,
             SystemAlertSeeder::class,
+            EmailTemplateSeeder::class,
         ]);
     }
 }
