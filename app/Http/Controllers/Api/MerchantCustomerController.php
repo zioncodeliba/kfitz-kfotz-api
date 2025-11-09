@@ -33,27 +33,27 @@ class MerchantCustomerController extends Controller
             ? $user->id
             : (int) $request->integer('merchant_user_id', 0);
 
-        if ($user->hasRole('admin') && $merchantUserId <= 0) {
-            return $this->validationErrorResponse([
-                'merchant_user_id' => ['Merchant user id is required for admin requests'],
-            ]);
-        }
+        $allowAllMerchants = $user->hasRole('admin') && $merchantUserId <= 0;
 
-        if ($merchantUserId <= 0) {
+        if (!$allowAllMerchants && $merchantUserId <= 0) {
             return $this->validationErrorResponse([
                 'merchant_user_id' => ['Unable to resolve merchant user id'],
             ]);
         }
 
         $query = MerchantCustomer::query()
-            ->where('merchant_user_id', $merchantUserId)
             ->select(['id', 'merchant_user_id', 'name', 'email', 'phone', 'notes', 'address', 'created_at', 'updated_at'])
             ->addSelect([
                 'last_order_at' => Order::select(DB::raw('MAX(created_at)'))
                     ->whereColumn('merchant_customers.id', 'orders.merchant_customer_id'),
             ])
             ->withCount('orders')
-            ->withSum('orders as total_spent', 'total');
+            ->withSum('orders as total_spent', 'total')
+            ->with(['merchantUser:id,name,email', 'merchant:user_id,business_name']);
+
+        if (!$allowAllMerchants) {
+            $query->where('merchant_user_id', $merchantUserId);
+        }
 
         if ($search = trim((string) $request->get('search', ''))) {
             $query->where(function ($searchQuery) use ($search) {
@@ -599,6 +599,12 @@ class MerchantCustomerController extends Controller
             'last_order_at' => $customer->last_order_at
                 ? Carbon::parse($customer->last_order_at)->toIso8601String()
                 : null,
+            'merchant' => [
+                'id' => $customer->merchant_user_id,
+                'name' => optional($customer->merchantUser)->name,
+                'email' => optional($customer->merchantUser)->email,
+                'business_name' => optional($customer->merchant)->business_name,
+            ],
         ];
     }
 

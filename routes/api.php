@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\SystemAlertController;
 use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\EmailTemplateController;
 use App\Http\Controllers\Api\EmailLogController;
+use App\Http\Controllers\Api\MailBroadcastController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -105,6 +106,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::post('/email/templates/{template}/send-test', [EmailTemplateController::class, 'sendTest']);
     Route::get('/email/logs', [EmailLogController::class, 'index']);
     Route::get('/email/logs/{log}', [EmailLogController::class, 'show']);
+    Route::post('/email/broadcast', [MailBroadcastController::class, 'sendEmail']);
     
 });
 
