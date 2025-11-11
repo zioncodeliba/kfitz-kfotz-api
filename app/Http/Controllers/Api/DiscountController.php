@@ -28,7 +28,11 @@ class DiscountController extends Controller
         ]);
 
         if ($user->isMerchant()) {
-            $query->ownedBy($user->id);
+            $query->where(function ($q) use ($user) {
+                $q->where('created_by', $user->id)
+                    ->orWhereNull('target_merchant_id')
+                    ->orWhere('target_merchant_id', $user->id);
+            });
         } elseif ($request->filled('created_by')) {
             $query->where('created_by', $request->integer('created_by'));
         }
