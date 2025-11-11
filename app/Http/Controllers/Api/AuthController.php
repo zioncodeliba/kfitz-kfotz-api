@@ -53,6 +53,10 @@ class AuthController extends Controller
             return $this->unauthorizedResponse('Invalid credentials');
         }
 
+        if ($user->role === 'merchant' && $user->status === 'blocked') {
+            return $this->forbiddenResponse('הכניסה שלך למערכת נחסמה. אנא פנה לתמיכה.');
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
         return $this->successResponse([

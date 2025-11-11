@@ -24,6 +24,7 @@ class UserResource extends JsonResource
             'updated_at' => $this->updated_at,
             'role' => $this->role,
             'roles' => [$this->role],
+            'status' => $this->status,
             'order_limit' => $this->order_limit !== null ? (float) $this->order_limit : null,
             'order_balance' => $this->order_balance !== null ? (float) $this->order_balance : null,
             'orders_count' => $this->when(isset($this->orders_count), (int) $this->orders_count),

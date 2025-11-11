@@ -67,6 +67,7 @@ class UserController extends Controller
             'password' => 'required|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'password_confirmation' => 'required|same:password',
             'role' => 'sometimes|in:admin,agent,merchant',
+            'status' => 'sometimes|in:active,inactive,blocked',
             'merchant_ids' => 'nullable|array',
             'merchant_ids.*' => 'integer|exists:merchants,id',
             'order_limit' => 'nullable|numeric|min:0',
@@ -75,10 +76,12 @@ class UserController extends Controller
         ]);
 
         $role = $validated['role'] ?? 'merchant';
+        $status = $validated['status'] ?? 'active';
         $orderLimit = isset($validated['order_limit']) ? (float) $validated['order_limit'] : null;
-        unset($validated['password_confirmation'], $validated['role'], $validated['order_limit']);
+        unset($validated['password_confirmation'], $validated['role'], $validated['order_limit'], $validated['status']);
         $validated['password'] = bcrypt($validated['password']);
         $validated['role'] = $role;
+        $validated['status'] = $status;
 
         $user = User::create($validated);
 
@@ -134,6 +137,7 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/',
             'password_confirmation' => 'required_with:password|same:password',
             'role' => 'sometimes|in:admin,agent,merchant',
+            'status' => 'sometimes|in:active,inactive,blocked',
             'merchant_ids' => 'nullable|array',
             'merchant_ids.*' => 'integer|exists:merchants,id',
             'order_limit' => 'nullable|numeric|min:0',
