@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\EmailTemplateController;
 use App\Http\Controllers\Api\EmailLogController;
 use App\Http\Controllers\Api\MailBroadcastController;
+use App\Http\Controllers\Api\EmailListController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -101,12 +102,22 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
 
     // Mail center
     Route::get('/email/templates', [EmailTemplateController::class, 'index']);
+    Route::post('/email/templates', [EmailTemplateController::class, 'store']);
     Route::get('/email/templates/{template}', [EmailTemplateController::class, 'show']);
     Route::put('/email/templates/{template}', [EmailTemplateController::class, 'update']);
     Route::post('/email/templates/{template}/send-test', [EmailTemplateController::class, 'sendTest']);
+    Route::post('/email/events/trigger', [EmailTemplateController::class, 'trigger']);
     Route::get('/email/logs', [EmailLogController::class, 'index']);
     Route::get('/email/logs/{log}', [EmailLogController::class, 'show']);
     Route::post('/email/broadcast', [MailBroadcastController::class, 'sendEmail']);
+    Route::delete('/email/templates/{template}', [EmailTemplateController::class, 'destroy']);
+    Route::get('/email/lists', [EmailListController::class, 'index']);
+    Route::post('/email/lists', [EmailListController::class, 'store']);
+    Route::get('/email/lists/{list}', [EmailListController::class, 'show']);
+    Route::put('/email/lists/{list}', [EmailListController::class, 'update']);
+    Route::delete('/email/lists/{list}', [EmailListController::class, 'destroy']);
+    Route::post('/email/lists/{list}/contacts', [EmailListController::class, 'addContacts']);
+    Route::delete('/email/lists/{list}/contacts/{contact}', [EmailListController::class, 'removeContact']);
     
 });
 
