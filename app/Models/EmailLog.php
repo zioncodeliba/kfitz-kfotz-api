@@ -12,6 +12,7 @@ class EmailLog extends Model
 
     protected $fillable = [
         'email_template_id',
+        'email_list_id',
         'event_key',
         'recipient_email',
         'recipient_name',
@@ -32,5 +33,10 @@ class EmailLog extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(EmailTemplate::class, 'email_template_id');
+    }
+
+    public function emailList(): BelongsTo
+    {
+        return $this->belongsTo(EmailList::class);
     }
 }

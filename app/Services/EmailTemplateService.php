@@ -11,18 +11,25 @@ use Throwable;
 
 class EmailTemplateService
 {
-    public function send(string $eventKey, array $payload, array $recipients = []): EmailLog
+    public function send(string $eventKey, array $payload, array $recipients = [], bool $includeMailingList = true): EmailLog
     {
-        $template = EmailTemplate::query()
+        $templateQuery = EmailTemplate::query()
             ->where('event_key', $eventKey)
-            ->where('is_active', true)
-            ->first();
+            ->where('is_active', true);
+
+        $template = $templateQuery->first();
 
         if (!$template) {
             return $this->createLog(null, $eventKey, $payload, 'skipped', 'Email template is not configured.');
         }
 
-        $resolvedRecipients = $this->resolveRecipients($template, $recipients, $payload);
+        if ($includeMailingList && $template->email_list_id) {
+            $template->loadMissing(['emailList.contacts' => function ($query) {
+                $query->orderBy('name')->orderBy('email');
+            }]);
+        }
+
+        $resolvedRecipients = $this->resolveRecipients($template, $recipients, $payload, $includeMailingList);
 
         if (empty($resolvedRecipients['to'])) {
             return $this->createLog($template, $eventKey, $payload, 'skipped', 'No recipients defined for template.');
@@ -34,6 +41,7 @@ class EmailTemplateService
 
         $log = EmailLog::create([
             'email_template_id' => $template->id,
+            'email_list_id' => $template->email_list_id,
             'event_key' => $eventKey,
             'recipient_email' => $resolvedRecipients['to'][0]['email'],
             'recipient_name' => $resolvedRecipients['to'][0]['name'] ?? null,
@@ -42,6 +50,10 @@ class EmailTemplateService
             'payload' => $payload,
             'meta' => [
                 'recipients' => $resolvedRecipients,
+                'body' => [
+                    'html' => $renderedHtml,
+                    'text' => $renderedText,
+                ],
             ],
         ]);
 
@@ -94,6 +106,7 @@ class EmailTemplateService
     {
         return EmailLog::create([
             'email_template_id' => $template?->id,
+            'email_list_id' => $template?->email_list_id,
             'event_key' => $eventKey,
             'recipient_email' => Arr::get($payload, 'recipient.email', ''),
             'recipient_name' => Arr::get($payload, 'recipient.name'),
@@ -105,7 +118,7 @@ class EmailTemplateService
         ]);
     }
 
-    protected function resolveRecipients(EmailTemplate $template, array $override, array $payload): array
+    protected function resolveRecipients(EmailTemplate $template, array $override, array $payload, bool $includeMailingList): array
     {
         $defaults = $template->default_recipients ?? [];
         $resolved = [
@@ -123,6 +136,13 @@ class EmailTemplateService
             }, $list);
 
             $resolved[$type] = array_values(array_filter($resolved[$type], fn ($recipient) => !empty($recipient['email'])));
+        }
+
+        if ($includeMailingList && $template->emailList && $template->emailList->relationLoaded('contacts')) {
+            $listRecipients = $this->buildRecipientsFromList($template->emailList->contacts);
+            if (!empty($listRecipients)) {
+                $resolved['to'] = $this->mergeRecipients($resolved['to'], $listRecipients);
+            }
         }
 
         return $resolved;
@@ -155,6 +175,52 @@ class EmailTemplateService
         }
 
         return $normalized;
+    }
+
+    protected function buildRecipientsFromList($contacts): array
+    {
+        if (!$contacts) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($contacts as $contact) {
+            $email = trim((string) ($contact->email ?? ''));
+            if ($email === '') {
+                continue;
+            }
+
+            $normalized[] = [
+                'email' => $email,
+                'name' => $contact->name ?: null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function mergeRecipients(array $base, array $additional): array
+    {
+        $seen = [];
+        foreach ($base as $recipient) {
+            $email = strtolower($recipient['email'] ?? '');
+            if ($email !== '') {
+                $seen[$email] = true;
+            }
+        }
+
+        foreach ($additional as $recipient) {
+            $email = strtolower($recipient['email'] ?? '');
+            if ($email === '' || isset($seen[$email])) {
+                continue;
+            }
+
+            $base[] = $recipient;
+            $seen[$email] = true;
+        }
+
+        return $base;
     }
 
     protected function renderString(string $template, array $payload): string

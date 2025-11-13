@@ -19,6 +19,7 @@ class EmailTemplate extends Model
         'body_text',
         'is_active',
         'default_recipients',
+        'email_list_id',
         'metadata',
         'updated_by',
     ];
@@ -32,6 +33,11 @@ class EmailTemplate extends Model
     public function logs(): HasMany
     {
         return $this->hasMany(EmailLog::class);
+    }
+
+    public function emailList(): BelongsTo
+    {
+        return $this->belongsTo(EmailList::class);
     }
 
     public function updatedBy(): BelongsTo

@@ -14,8 +14,14 @@ class EmailLogController extends Controller
     public function index(Request $request)
     {
         $logs = EmailLog::query()
-            ->with('template:id,event_key,name')
+            ->with([
+                'template:id,event_key,name,email_list_id',
+                'template.emailList:id,name',
+                'emailList:id,name',
+            ])
             ->when($request->filled('event_key'), fn ($query) => $query->where('event_key', $request->input('event_key')))
+            ->when($request->filled('email_template_id'), fn ($query) => $query->where('email_template_id', $request->integer('email_template_id')))
+            ->when($request->filled('email_list_id'), fn ($query) => $query->where('email_list_id', $request->integer('email_list_id')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->input('status')))
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->input('search');
@@ -33,7 +39,7 @@ class EmailLogController extends Controller
 
     public function show(EmailLog $log)
     {
-        $log->load('template');
+        $log->load(['template', 'emailList']);
 
         return $this->successResponse($log);
     }

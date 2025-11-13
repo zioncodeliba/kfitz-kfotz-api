@@ -44,6 +44,10 @@ class MailBroadcastService
                 'meta' => [
                     'mode' => 'email',
                     'broadcast_type' => $recipient['type'] ?? null,
+                    'body' => [
+                        'html' => $renderedHtml,
+                        'text' => $renderedText,
+                    ],
                 ],
             ]);
 

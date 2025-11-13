@@ -8,6 +8,7 @@ use App\Services\EmailTemplateService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class EmailTemplateController extends Controller
 {
@@ -18,6 +19,7 @@ class EmailTemplateController extends Controller
         $search = $request->input('search');
 
         $templates = EmailTemplate::query()
+            ->with('emailList:id,name')
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
@@ -33,7 +35,7 @@ class EmailTemplateController extends Controller
 
     public function show(EmailTemplate $template)
     {
-        return $this->successResponse($template);
+        return $this->successResponse($template->load('emailList'));
     }
 
     public function store(Request $request)
@@ -51,8 +53,14 @@ class EmailTemplateController extends Controller
             'body_text' => 'nullable|string',
             'is_active' => 'nullable|boolean',
             'default_recipients' => 'nullable|array',
+            'email_list_id' => 'nullable|exists:email_lists,id',
             'metadata' => 'nullable|array',
         ]);
+
+        $this->assertRecipientSource(
+            $validated['default_recipients'] ?? null,
+            $validated['email_list_id'] ?? null
+        );
 
         $payload = array_merge(
             [
@@ -64,7 +72,7 @@ class EmailTemplateController extends Controller
             ],
         );
 
-        $template = EmailTemplate::create($payload);
+        $template = EmailTemplate::create($payload)->load('emailList');
 
         return $this->createdResponse($template, 'Template created successfully');
     }
@@ -78,14 +86,23 @@ class EmailTemplateController extends Controller
             'body_text' => 'nullable|string',
             'is_active' => 'nullable|boolean',
             'default_recipients' => 'nullable|array',
+            'email_list_id' => 'nullable|exists:email_lists,id',
             'metadata' => 'nullable|array',
         ]);
+
+        $finalEmailListId = array_key_exists('email_list_id', $validated)
+            ? $validated['email_list_id']
+            : $template->email_list_id;
+
+        $finalRecipients = $validated['default_recipients'] ?? $template->default_recipients;
+
+        $this->assertRecipientSource($finalRecipients, $finalEmailListId);
 
         $template->fill($validated);
         $template->updated_by = $request->user()->id;
         $template->save();
 
-        return $this->successResponse($template->fresh(), 'Template updated successfully');
+        return $this->successResponse($template->fresh('emailList'), 'Template updated successfully');
     }
 
     public function sendTest(Request $request, EmailTemplate $template, EmailTemplateService $emailService)
@@ -101,7 +118,7 @@ class EmailTemplateController extends Controller
         $recipients = $validated['recipients'];
         $payload = $validated['payload'] ?? [];
 
-        $log = $emailService->send($template->event_key, $payload, $recipients);
+        $log = $emailService->send($template->event_key, $payload, $recipients, includeMailingList: false);
 
         return $this->successResponse($log, 'Test email triggered');
     }
@@ -131,5 +148,43 @@ class EmailTemplateController extends Controller
         $template->delete();
 
         return $this->successResponse(null, 'Template deleted successfully');
+    }
+
+    protected function assertRecipientSource(?array $defaultRecipients, ?int $emailListId): void
+    {
+        if ($emailListId || $this->hasPrimaryRecipients($defaultRecipients)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'default_recipients.to' => 'Please define at least one TO recipient or choose a mailing list.',
+        ]);
+    }
+
+    protected function hasPrimaryRecipients($defaultRecipients): bool
+    {
+        if (!$defaultRecipients || !array_key_exists('to', $defaultRecipients)) {
+            return false;
+        }
+
+        $to = $defaultRecipients['to'];
+
+        if (is_string($to)) {
+            return trim($to) !== '';
+        }
+
+        if (is_array($to)) {
+            foreach ($to as $recipient) {
+                if (is_string($recipient) && trim($recipient) !== '') {
+                    return true;
+                }
+
+                if (is_array($recipient) && !empty($recipient['email'])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
