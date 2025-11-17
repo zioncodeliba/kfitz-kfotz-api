@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\EmailLogController;
 use App\Http\Controllers\Api\MailBroadcastController;
 use App\Http\Controllers\Api\EmailListController;
 use App\Http\Controllers\Api\MerchantBannerController;
+use App\Http\Controllers\Api\MerchantPopupController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -165,6 +166,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/merchant-banners/{merchantBanner}', [MerchantBannerController::class, 'destroy'])
         ->whereNumber('merchantBanner');
 
+    Route::get('/merchant-popup/settings', [MerchantPopupController::class, 'show']);
+    Route::put('/merchant-popup/settings', [MerchantPopupController::class, 'update']);
+
     Route::apiResource('discounts', DiscountController::class);
 });
 
@@ -178,6 +182,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::put('/merchant/profile', [MerchantController::class, 'updateProfile']);
     Route::get('/merchant/dashboard', [MerchantController::class, 'dashboard']);
     Route::get('/merchant-banners/active', [MerchantBannerController::class, 'active']);
+    Route::get('/merchant-popup/active', [MerchantPopupController::class, 'active']);
     
     // Shipment management
     Route::get('/shipments', [ShipmentController::class, 'index']);

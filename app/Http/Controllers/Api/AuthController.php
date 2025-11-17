@@ -8,6 +8,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Models\MerchantPopup;
 use App\Notifications\VerifyEmailNotification;
 
 class AuthController extends Controller
@@ -67,7 +68,23 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        if ($user && $user->role === 'merchant') {
+            $merchantId = optional($user->merchant)->id;
+
+            MerchantPopup::query()
+                ->where('is_active', true)
+                ->where(function ($query) use ($merchantId) {
+                    $query->whereNull('merchant_id');
+                    if ($merchantId !== null) {
+                        $query->orWhere('merchant_id', $merchantId);
+                    }
+                })
+                ->update(['display_once' => false]);
+        }
+
+        $user?->currentAccessToken()?->delete();
         
         return $this->successResponse(null, 'Logged out successfully');
     }
