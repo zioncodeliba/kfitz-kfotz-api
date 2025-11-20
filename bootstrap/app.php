@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
    ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'check.user.role' => \App\Http\Middleware\CheckUserRole::class,
+            'log.plugin.access' => \App\Http\Middleware\LogPluginApiAccess::class,
         ]);
     })
 

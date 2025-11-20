@@ -10,20 +10,34 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Traits\ApiResponse;
+use App\Traits\HandlesPluginPricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class PluginOrderController extends Controller
 {
     use ApiResponse;
+    use HandlesPluginPricing;
 
     public function store(Request $request)
     {
         $user = $request->user();
 
         if (!$user->hasRole('merchant')) {
+            Log::warning('Plugin order blocked: user lacks merchant role', [
+                'user_id' => $user?->id,
+                'roles' => $user?->getRoleNames(),
+            ]);
             return $this->errorResponse('Insufficient permissions', 403);
         }
+
+        Log::info('Plugin order submission started', [
+            'user_id' => $user->id,
+            'site_url' => $request->input('site_url'),
+            'external_id' => $request->input('external_id'),
+            'items_count' => is_array($request->input('items')) ? count($request->input('items')) : 0,
+        ]);
 
         $data = $request->validate([
             'site_url' => 'required|string|max:255',
@@ -60,10 +74,19 @@ class PluginOrderController extends Controller
         $site = MerchantSite::where('site_url', trim($data['site_url']))->first();
 
         if (!$site) {
+            Log::warning('Plugin order blocked: site not found', [
+                'user_id' => $user->id,
+                'site_url' => $data['site_url'],
+            ]);
             return $this->errorResponse('Plugin site not found', 404);
         }
 
         if ($site->user_id !== $user->id) {
+            Log::warning('Plugin order blocked: site not owned by merchant', [
+                'user_id' => $user->id,
+                'site_id' => $site->id,
+                'site_owner' => $site->user_id,
+            ]);
             return $this->errorResponse('Site does not belong to the authenticated merchant', 403);
         }
 
@@ -83,6 +106,11 @@ class PluginOrderController extends Controller
             $products = Product::with('productVariations')->whereIn('id', $productIds)->get()->keyBy('id');
 
             if ($products->count() !== $productIds->count()) {
+                Log::warning('Plugin order blocked: one or more products missing', [
+                    'user_id' => $user->id,
+                    'site_id' => $site->id,
+                    'product_ids' => $productIds,
+                ]);
                 DB::rollBack();
                 return $this->errorResponse('One or more products were not found for this merchant.', 422);
             }
@@ -98,11 +126,21 @@ class PluginOrderController extends Controller
                 $productId = (int) ($item['product_id'] ?? 0);
                 $product = $products->get($productId);
                 if (!$product) {
+                    Log::warning('Plugin order blocked: product missing during iteration', [
+                        'user_id' => $user->id,
+                        'site_id' => $site->id,
+                        'product_id' => $productId,
+                    ]);
                     DB::rollBack();
                     return $this->errorResponse('One or more products were not found for this merchant.', 422);
                 }
 
                 if (!$this->isProductAvailableForPluginSite($product, $site->id)) {
+                    Log::warning('Plugin order blocked: product unavailable for site', [
+                        'user_id' => $user->id,
+                        'site_id' => $site->id,
+                        'product_id' => $productId,
+                    ]);
                     DB::rollBack();
                     return $this->errorResponse(sprintf(
                         'Product %s is not available for this plugin site.',
@@ -113,6 +151,12 @@ class PluginOrderController extends Controller
                 $quantity = max((float) ($item['quantity'] ?? 0), 0.0001);
 
                 if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                    Log::warning('Plugin order blocked: insufficient product stock', [
+                        'user_id' => $user->id,
+                        'product_id' => $productId,
+                        'requested_quantity' => $quantity,
+                        'available_stock' => $product->stock_quantity,
+                    ]);
                     DB::rollBack();
                     return $this->errorResponse(sprintf('Insufficient stock for product: %s', $product->name), 400);
                 }
@@ -123,17 +167,32 @@ class PluginOrderController extends Controller
                     $variation = $product->productVariations->firstWhere('id', $variationId);
 
                     if (!$variation) {
+                        Log::warning('Plugin order blocked: variation mismatch', [
+                            'user_id' => $user->id,
+                            'product_id' => $productId,
+                            'variation_id' => $variationId,
+                        ]);
                         DB::rollBack();
                         return $this->errorResponse('Selected variation does not belong to the chosen product.', 422);
                     }
 
                     if ($variation->inventory !== null && $variation->inventory < $quantity) {
+                        Log::warning('Plugin order blocked: insufficient variation stock', [
+                            'user_id' => $user->id,
+                            'variation_id' => $variationId,
+                            'requested_quantity' => $quantity,
+                            'available_inventory' => $variation->inventory,
+                        ]);
                         DB::rollBack();
                         return $this->errorResponse(sprintf('Insufficient stock for selected variation of product: %s', $product->name), 400);
                     }
                 }
 
                 if ($product->productVariations->isNotEmpty() && !$variation) {
+                    Log::warning('Plugin order blocked: variation required but missing', [
+                        'user_id' => $user->id,
+                        'product_id' => $productId,
+                    ]);
                     DB::rollBack();
                     return $this->errorResponse(sprintf('Product %s requires selecting a variation.', $product->name), 422);
                 }
@@ -287,6 +346,15 @@ class PluginOrderController extends Controller
 
             DB::commit();
 
+            Log::info('Plugin order created successfully', [
+                'user_id' => $user->id,
+                'site_id' => $site->id,
+                'order_id' => $order->id,
+                'external_id' => $order->source_reference,
+                'items_count' => $order->items()->count(),
+                'total' => $order->total,
+            ]);
+
             $merchantUser->refreshOrderFinancials();
 
             return $this->createdResponse(
@@ -295,6 +363,11 @@ class PluginOrderController extends Controller
             );
         } catch (\Throwable $exception) {
             DB::rollBack();
+            Log::error('Plugin order creation failed', [
+                'user_id' => $user->id ?? null,
+                'site_id' => $site->id ?? null,
+                'error' => $exception->getMessage(),
+            ]);
             report($exception);
 
             return $this->errorResponse('Failed to create order from plugin', 500);
@@ -477,178 +550,6 @@ class PluginOrderController extends Controller
         $digits = preg_replace('/\D+/', '', $phone);
 
         return $digits !== '' ? $digits : null;
-    }
-
-    /**
-     * Pick a unit price dedicated to a specific plugin site when available.
-     */
-    protected function resolvePluginSiteUnitPrice(Product $product, int $siteId): ?float
-    {
-        if ($siteId <= 0) {
-            return null;
-        }
-
-        $prices = $product->plugin_site_prices;
-        if (!is_array($prices) || empty($prices)) {
-            return null;
-        }
-
-        foreach ($prices as $entry) {
-            if (is_object($entry)) {
-                $entry = (array) $entry;
-            }
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $entrySiteId = $entry['site_id'] ?? null;
-            if ($entrySiteId === null) {
-                continue;
-            }
-
-            if ((int) $entrySiteId !== $siteId) {
-                continue;
-            }
-
-            if (array_key_exists('is_enabled', $entry) && !$entry['is_enabled']) {
-                return null;
-            }
-
-            $rawPrice = $entry['price'] ?? null;
-            if (is_numeric($rawPrice)) {
-                $price = (float) $rawPrice;
-                return $price >= 0 ? $price : null;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Determine whether a product is available for orders coming from a plugin site.
-     */
-    protected function isProductAvailableForPluginSite(Product $product, int $siteId): bool
-    {
-        if ($siteId <= 0) {
-            return true;
-        }
-
-        $prices = $product->plugin_site_prices;
-        if (!is_array($prices) || empty($prices)) {
-            return true;
-        }
-
-        foreach ($prices as $entry) {
-            if (is_object($entry)) {
-                $entry = (array) $entry;
-            }
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $entrySiteId = $entry['site_id'] ?? null;
-            if ($entrySiteId === null) {
-                continue;
-            }
-
-            if ((int) $entrySiteId !== $siteId) {
-                continue;
-            }
-
-            if (!array_key_exists('is_enabled', $entry)) {
-                return true;
-            }
-
-            return filter_var($entry['is_enabled'], FILTER_VALIDATE_BOOLEAN) !== false;
-        }
-
-        return true;
-    }
-
-    protected function resolveMerchantUnitPrice(Product $product, int $merchantUserId): ?float
-    {
-        $prices = $product->merchant_prices;
-        if (!is_array($prices) || empty($prices)) {
-            return null;
-        }
-
-        foreach ($prices as $entry) {
-            if (is_object($entry)) {
-                $entry = (array) $entry;
-            }
-            if (!is_array($entry)) {
-                continue;
-            }
-
-            $entryMerchantId = $entry['merchant_id'] ?? null;
-            if ($entryMerchantId === null) {
-                continue;
-            }
-
-            if ((int) $entryMerchantId !== $merchantUserId) {
-                continue;
-            }
-
-            $rawPrice = $entry['price'] ?? null;
-            if (is_numeric($rawPrice)) {
-                $price = (float) $rawPrice;
-                return $price >= 0 ? $price : null;
-            }
-        }
-
-        return null;
-    }
-
-    protected function determinePluginUnitPrice(
-        Product $product,
-        ?ProductVariation $variation,
-        ?float $pluginPrice,
-        ?float $merchantPrice
-    ): array {
-        $productPrice = max(0, (float) $product->getCurrentPrice());
-
-        if ($pluginPrice !== null && $pluginPrice < 0) {
-            $pluginPrice = null;
-        }
-
-        if ($merchantPrice !== null && $merchantPrice < 0) {
-            $merchantPrice = null;
-        }
-
-        $basePrice = $pluginPrice ?? $merchantPrice ?? $productPrice;
-
-        $variationPrice = null;
-        if ($variation && $variation->price !== null && is_numeric($variation->price)) {
-            $candidate = (float) $variation->price;
-            if ($candidate >= 0) {
-                $variationPrice = $candidate;
-            }
-        }
-
-        $unitPrice = $basePrice;
-        if ($variationPrice !== null && $variationPrice < $basePrice) {
-            $unitPrice = $variationPrice;
-        }
-
-        $unitPrice = round($unitPrice, 2);
-        $productPrice = round($productPrice, 2);
-        if ($pluginPrice !== null) {
-            $pluginPrice = round($pluginPrice, 2);
-        }
-        if ($merchantPrice !== null) {
-            $merchantPrice = round($merchantPrice, 2);
-        }
-        if ($variationPrice !== null) {
-            $variationPrice = round($variationPrice, 2);
-        }
-
-        return [
-            'unit_price' => $unitPrice,
-            'product_price' => $productPrice,
-            'plugin_price' => $pluginPrice,
-            'merchant_price' => $merchantPrice,
-            'variation_price' => $variationPrice,
-        ];
     }
 
     protected function refreshProductVariationsSnapshot(Product $product): void

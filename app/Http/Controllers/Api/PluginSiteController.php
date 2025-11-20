@@ -107,8 +107,15 @@ class PluginSiteController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->hasRole('admin')) {
+        $isAdmin = $user->hasRole('admin');
+        $isMerchant = $user->hasRole('merchant');
+
+        if (!$isAdmin && !$isMerchant) {
             return $this->errorResponse('Unauthorized', 403);
+        }
+
+        if (!$isAdmin) {
+            $request->merge(['user_id' => $user->id]);
         }
 
         $data = $request->validate([
@@ -130,13 +137,13 @@ class PluginSiteController extends Controller
             'credit_limit' => 'nullable|numeric',
         ]);
 
-        $targetUser = User::findOrFail($data['user_id']);
+        $targetUser = $isAdmin ? User::findOrFail($data['user_id']) : $user;
         if (!$targetUser->hasRole('merchant')) {
             return $this->errorResponse('ניתן להוסיף אתר רק למשתמש בעל תפקיד סוחר.', 422);
         }
 
         $attributes = [
-            'user_id' => $data['user_id'],
+            'user_id' => $targetUser->id,
             'site_url' => trim($data['site_url']),
             'name' => isset($data['name']) ? trim((string) $data['name']) : null,
             'platform' => isset($data['platform']) ? trim((string) $data['platform']) : null,

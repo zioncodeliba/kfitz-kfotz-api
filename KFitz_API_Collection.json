@@ -980,7 +980,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"notes\": \"\u05d4\u05d6\u05de\u05e0\u05ea \u05d1\u05d3\u05d9\u05e7\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\"\n}",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"notes\": \"הזמנת בדיקה מפוסטמן\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1011,7 +1011,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"\u05e0\u05d9\u05e1\u05d5\u05df: \u05d7\u05d5\u05e1\u05e8 \\u05d0\\u05d7\\u05d3 \\u05e6\\u05e8\\u05d9\\u05da\\u05e9\\u05dc\\u05d9\\u05d1\\u05d3\\u05d5\"\n}",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"ניסון: חוסר \\u05d0\\u05d7\\u05d3 \\u05e6\\u05e8\\u05d9\\u05da\\u05e9\\u05dc\\u05d9\\u05d1\\u05d3\\u05d5\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1079,7 +1079,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"processing\",\n  \"payment_status\": \"pending\",\n  \"notes\": \"\u05e2\u05d3\u05db\u05d5\u05df \u05e1\u05d8\u05d8\u05d5\u05e1 \u05d4\u05d6\u05de\u05e0\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"billing_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d4\u05e8\u05e6\u05dc 12\",\n    \"city\": \"\u05e4\u05ea\u05d7 \u05ea\u05e7\u05d5\u05d5\u05d4\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  }\n}",
+              "raw": "{\n  \"status\": \"processing\",\n  \"payment_status\": \"pending\",\n  \"notes\": \"עדכון סטטוס הזמנה לבדיקה\",\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  },\n  \"billing_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1264,7 +1264,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"delivery_window\": \"09:00-14:00\",\n  \"requires_signature\": true,\n  \"leave_at_door\": false,\n  \"pickup_point\": null,\n  \"comments\": \"\u05e0\u05d0 \u05dc\u05d4\u05ea\u05e7\u05e9\u05e8 30 \u05d3\u05e7\u05d5\u05ea \u05dc\u05e4\u05e0\u05d9 \u05d4\u05d2\u05e2\u05d4\"\n}",
+              "raw": "{\n  \"delivery_window\": \"09:00-14:00\",\n  \"requires_signature\": true,\n  \"leave_at_door\": false,\n  \"pickup_point\": null,\n  \"comments\": \"נא להתקשר 30 דקות לפני הגעה\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1350,7 +1350,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"tracking_number\": \"TRACK12345\",\n  \"status\": \"pending\",\n  \"weight\": 2.6,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 15,\n  \"notes\": \"\u05de\u05e9\u05dc\u05d5\u05d7 \u05d1\u05d3\u05d9\u05e7\u05d4 - \u05d7\u05d5\u05dc\u05e6\u05d5\u05ea \u05d1\u05d9\u05d9\u05d1\u05d9\"\n}",
+              "raw": "{\n  \"order_id\": \"{{order_id}}\",\n  \"carrier_id\": \"{{shipping_carrier_id}}\",\n  \"tracking_number\": \"TRACK12345\",\n  \"status\": \"pending\",\n  \"weight\": 2.6,\n  \"length\": 30,\n  \"width\": 20,\n  \"height\": 15,\n  \"notes\": \"משלוח בדיקה - חולצות בייבי\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1470,7 +1470,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"in_transit\",\n  \"location\": \"\u05de\u05e8\u05db\u05d6 \u05dc\u05d5\u05d2\u05d9\u05e1\u05d8\u05d9, \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n  \"details\": \"\u05d4\u05de\u05e9\u05dc\u05d5\u05d7 \u05de\u05d5\u05d9\u05df \u05d5\u05e0\u05e9\u05dc\u05d7 \u05dc\u05d4\u05e4\u05e6\u05d4\",\n  \"occurred_at\": \"2024-11-01T10:30:00+02:00\"\n}",
+              "raw": "{\n  \"status\": \"in_transit\",\n  \"location\": \"מרכז לוגיסטי, תל אביב\",\n  \"details\": \"המשלוח מוין ונשלח להפצה\",\n  \"occurred_at\": \"2024-11-01T10:30:00+02:00\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1525,7 +1525,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"business_name\": \"Merchant LTD\",\n  \"business_id\": \"123456789\",\n  \"phone\": \"+97251000000\",\n  \"website\": \"https://merchant.example.com\",\n  \"description\": \"\u05d7\u05e0\u05d5\u05ea \u05dc\u05d3\u05d5\u05d2\u05de\u05d4 \u05dc\u05e9\u05dc\u05d9\u05d7\u05ea \u05d1\u05d3\u05d9\u05e7\u05d5\u05ea\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"company\": \"\u05d7\u05d1\u05e8\u05ea \u05dc\u05e7\u05d5\u05d7 \u05d1\u05e2\\\"\u05de\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d3\u05e8\u05da \u05d4\u05e9\u05dc\u05d5\u05dd 45\",\n    \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  },\n  \"bank_details\": {\n    \"bank_name\": \"\u05d4\u05e4\u05d5\u05e2\u05dc\u05d9\u05dd\",\n    \"branch_number\": \"123\",\n    \"account_number\": \"456789\",\n    \"account_name\": \"Merchant LTD\"\n  }\n}",
+              "raw": "{\n  \"business_name\": \"Merchant LTD\",\n  \"business_id\": \"123456789\",\n  \"phone\": \"+97251000000\",\n  \"website\": \"https://merchant.example.com\",\n  \"description\": \"חנות לדוגמה לשליחת בדיקות\",\n  \"address\": {\n    \"name\": \"רות כהן\",\n    \"company\": \"חברת לקוח בע\\\"מ\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"דרך השלום 45\",\n    \"city\": \"תל אביב\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  },\n  \"bank_details\": {\n    \"bank_name\": \"הפועלים\",\n    \"branch_number\": \"123\",\n    \"account_number\": \"456789\",\n    \"account_name\": \"Merchant LTD\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1613,7 +1613,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Customer\",\n  \"phone\": \"+972520000000\",\n  \"notes\": \"\u05de\u05e2\u05d3\u05d9\u05e3 \u05de\u05e1\u05d9\u05e8\u05d4 \u05d1\u05d1\u05d5\u05e7\u05e8\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  }\n}",
+              "raw": "{\n  \"name\": \"Updated Customer\",\n  \"phone\": \"+972520000000\",\n  \"notes\": \"מעדיף מסירה בבוקר\",\n  \"address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1630,37 +1630,9 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/plugin/orders",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "plugin",
-                "orders"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05e0\u05d5\u05e2\u05dd \u05d4\u05dc\u05e7\u05d5\u05d7\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n      \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n      \"state\": \"\u05de\u05d7\u05d5\u05d6 \u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"\u05dc\u05e7\u05d5\u05d7 \u05d7\u05d5\u05d6\u05e8 \u05de\u05d4\u05d7\u05e0\u05d5\u05ea \u05d4\u05de\u05e7\u05d5\u05d5\u05e0\u05ea\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Plugin order (missing variation - expect 422)",
-          "request": {
-            "method": "POST",
-            "header": [
+              },
               {
-                "key": "Content-Type",
+                "key": "Accept",
                 "value": "application/json"
               }
             ],
@@ -1677,7 +1649,43 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"MISSING-VAR-{{plugin_order_number}}\",\n  \"total\": 199.9,\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"customer\": {\n    \"name\": \"\u05de\u05d1\u05d7\u05df \u05e4\u05dc\u05d0\u05d2\u05d9\u05df\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"\u05ea\u05d5\u05d1\u05dc 12\",\n      \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n      \"state\": \"\u05d4\u05de\u05e9 \u05d4\",\n      \"zip\": \"12345\",\n      \"country\": \"IL\"\n    }\n  }\n}",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"PLUGIN-{{plugin_order_number}}\",\n  \"total\": 399.7,\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    },\n    {\n      \"product_id\": \"{{secondary_product_id}}\",\n      \"variation_id\": \"{{secondary_product_variation_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"customer\": {\n    \"name\": \"נועם הלקוח\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"תובל 32\",\n      \"city\": \"רמת גן\",\n      \"state\": \"מחוז תל אביב\",\n      \"zip\": \"52522\",\n      \"country\": \"IL\"\n    },\n    \"notes\": \"לקוח חוזר מהחנות המקוונת\"\n  },\n  \"source\": \"shopify\",\n  \"status\": \"paid\",\n  \"shipping\": {\n    \"type\": \"delivery\",\n    \"method\": \"standard\",\n    \"cost\": 0\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Plugin order (missing variation - expect 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"order_number\": \"MISSING-VAR-{{plugin_order_number}}\",\n  \"total\": 199.9,\n  \"items\": [\n    {\n      \"product_id\": \"{{variant_product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"customer\": {\n    \"name\": \"מבחן פלאגין\",\n    \"email\": \"customer@example.com\",\n    \"phone\": \"+972500000000\",\n    \"address\": {\n      \"line1\": \"תובל 12\",\n      \"city\": \"תל אביב\",\n      \"state\": \"המש ה\",\n      \"zip\": \"12345\",\n      \"country\": \"IL\"\n    }\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1862,7 +1870,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+972530000000\",\n  \"notes\": \"\u05e2\u05d5\u05d3\u05db\u05df \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\"\n}",
+                  "raw": "{\n  \"name\": \"Updated Name\",\n  \"phone\": \"+972530000000\",\n  \"notes\": \"עודכן מפוסטמן לבדיקה\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1916,7 +1924,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"New Category\",\n  \"description\": \"\u05e7\u05d8\u05d2\u05d5\u05e8\u05d9\u05d4 \u05dc\u05d3\u05d5\u05d2\u05de\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"is_active\": true\n}",
+                  "raw": "{\n  \"name\": \"New Category\",\n  \"description\": \"קטגוריה לדוגמה לבדיקה\",\n  \"is_active\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1948,7 +1956,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Updated Category\",\n  \"description\": \"\u05e2\u05d3\u05db\u05d5\u05df \u05e7\u05d8\u05d2\u05d5\u05e8\u05d9\u05d4 \u05de\u05e4\u05d5\u05e1\u05d8\u05de\u05df\",\n  \"is_active\": true\n}",
+                  "raw": "{\n  \"name\": \"Updated Category\",\n  \"description\": \"עדכון קטגוריה מפוסטמן\",\n  \"is_active\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2002,7 +2010,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"New Product\",\n  \"sku\": \"SKU-001\",\n  \"price\": 199.9,\n  \"stock_quantity\": 10,\n  \"category_id\": \"{{category_id}}\",\n  \"description\": \"\u05de\u05d5\u05e6\u05e8 \u05d7\u05d3\u05e9 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"status\": \"active\",\n  \"weight\": 1.5,\n  \"tax_rate\": 0.17\n}",
+                  "raw": "{\n  \"name\": \"New Product\",\n  \"sku\": \"SKU-001\",\n  \"price\": 199.9,\n  \"stock_quantity\": 10,\n  \"category_id\": \"{{category_id}}\",\n  \"description\": \"מוצר חדש לבדיקה\",\n  \"status\": \"active\",\n  \"weight\": 1.5,\n  \"tax_rate\": 0.17\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2140,7 +2148,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"business_name\": \"Merchant Ltd\",\n  \"business_id\": \"987654321\",\n  \"phone\": \"+972540000000\",\n  \"status\": \"active\",\n  \"address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"company\": \"\u05d7\u05d1\u05e8\u05ea \u05dc\u05e7\u05d5\u05d7 \u05d1\u05e2\\\"\u05de\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05d3\u05e8\u05da \u05d4\u05e9\u05dc\u05d5\u05dd 45\",\n    \"city\": \"\u05ea\u05dc \u05d0\u05d1\u05d9\u05d1\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"\u05e8\u05d5\u05ea \u05db\u05d4\u05df\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"\u05ea\u05d5\u05d1\u05dc 32\",\n    \"city\": \"\u05e8\u05de\u05ea \u05d2\u05df\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"\u05dc\u05ea\u05d0\u05dd \u05de\u05e1\u05d9\u05e8\u05d4 \u05de\u05e8\u05d0\u05e9\"\n  }\n}",
+                  "raw": "{\n  \"business_name\": \"Merchant Ltd\",\n  \"business_id\": \"987654321\",\n  \"phone\": \"+972540000000\",\n  \"status\": \"active\",\n  \"address\": {\n    \"name\": \"רות כהן\",\n    \"company\": \"חברת לקוח בע\\\"מ\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"דרך השלום 45\",\n    \"city\": \"תל אביב\",\n    \"zip\": \"61000\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  }\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2261,7 +2269,7 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"name\": \"Speedy Express\",\n  \"code\": \"SPEEDY\",\n  \"description\": \"\u05d7\u05d1\u05e8\u05ea \u05de\u05e9\u05dc\u05d5\u05d7\u05d9\u05dd \u05de\u05d4\u05d9\u05e8\u05d4 \u05dc\u05d1\u05d3\u05d9\u05e7\u05d4\",\n  \"api_url\": \"https://carrier.example.com/api\",\n  \"api_key\": \"test-key\",\n  \"api_secret\": \"test-secret\",\n  \"base_rate\": 25,\n  \"rate_per_kg\": 9.9,\n  \"service_types\": [\n    \"regular\",\n    \"express\"\n  ],\n  \"is_active\": true,\n  \"is_test_mode\": true\n}",
+                  "raw": "{\n  \"name\": \"Speedy Express\",\n  \"code\": \"SPEEDY\",\n  \"description\": \"חברת משלוחים מהירה לבדיקה\",\n  \"api_url\": \"https://carrier.example.com/api\",\n  \"api_key\": \"test-key\",\n  \"api_secret\": \"test-secret\",\n  \"base_rate\": 25,\n  \"rate_per_kg\": 9.9,\n  \"service_types\": [\n    \"regular\",\n    \"express\"\n  ],\n  \"is_active\": true,\n  \"is_test_mode\": true\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -2472,7 +2480,12 @@
               "name": "List plugin sites",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/plugin-sites",
                   "host": [
@@ -2492,6 +2505,10 @@
                 "header": [
                   {
                     "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Accept",
                     "value": "application/json"
                   }
                 ],
@@ -2517,6 +2534,263 @@
               }
             }
           ]
+        }
+      ]
+    },
+    {
+      "name": "Plugin Integrations",
+      "description": "Helpers for plugin store integrations: authentication, plugin site creation, product sync and order import.",
+      "item": [
+        {
+          "name": "Plugin Login (merchant credentials)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{merchant_email}}\",\n  \"password\": \"{{merchant_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const data = json && json.data ? json.data : {};",
+                  "const token = data.token;",
+                  "pm.test('Token received', function () {",
+                  "    pm.expect(token, 'token').to.exist;",
+                  "});",
+                  "if (token) {",
+                  "    pm.collectionVariables.set('auth_token', token);",
+                  "    pm.collectionVariables.set('active_role', 'merchant');",
+                  "}",
+                  "if (data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('last_user_id', data.user.id.toString());",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Plugin Verify Session (/api/me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Site - Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin-sites",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin-sites"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"name\": \"Default FB Shop\",\n  \"platform\": \"wordpress\",\n  \"contact_name\": \"Marketplace Admin\",\n  \"contact_phone\": \"+972520000000\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Plugin Products - List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/products?site_url={{plugin_site_url}}&per_page=50",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "per_page",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Products - Show",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/products/{{product_id}}?site_url={{plugin_site_url}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "products",
+                "{{product_id}}"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Products - Inventory Snapshot",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/products/inventory?site_url={{plugin_site_url}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "products",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Products - Single Inventory",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/products/{{product_id}}/inventory?site_url={{plugin_site_url}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "products",
+                "{{product_id}}",
+                "inventory"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Order - Create",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"site_url\": \"{{plugin_site_url}}\",\n  \"external_id\": \"WP-ORDER-{{plugin_order_number}}\",\n  \"customer\": {\n    \"name\": \"WordPress Buyer\",\n    \"phone\": \"+972501234567\",\n    \"email\": \"buyer@example.com\",\n    \"address\": {\n      \"line1\": \"Herzl 5\",\n      \"city\": \"Tel Aviv\",\n      \"zip\": \"61000\",\n      \"country\": \"IL\"\n    }\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"totals\": {\n    \"subtotal\": 199.9,\n    \"tax\": 34.0,\n    \"shipping_cost\": 20,\n    \"discount\": 0,\n    \"total\": 253.9\n  },\n  \"shipping\": {\n    \"method\": \"delivery\",\n    \"type\": \"regular\",\n    \"cost\": 20\n  },\n  \"notes\": \"Imported from plugin demo\"\n}"
+            }
+          }
         }
       ]
     }

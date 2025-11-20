@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\MerchantCustomerController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\PluginSiteController;
 use App\Http\Controllers\Api\PluginOrderController;
+use App\Http\Controllers\Api\PluginProductController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
 use App\Http\Controllers\Api\DiscountController;
@@ -100,7 +101,6 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::get('/merchant/shipping-settings', [MerchantController::class, 'getShippingSettings']);
     Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
     Route::get('/plugin-sites', [PluginSiteController::class, 'index']);
-    Route::post('/plugin-sites', [PluginSiteController::class, 'store']);
 
     // Mail center
     Route::get('/email/templates', [EmailTemplateController::class, 'index']);
@@ -121,6 +121,10 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::post('/email/lists/{list}/contacts', [EmailListController::class, 'addContacts']);
     Route::delete('/email/lists/{list}/contacts/{contact}', [EmailListController::class, 'removeContact']);
     
+});
+
+Route::middleware(['log.plugin.access', 'auth:sanctum', 'verified'])->group(function () {
+    Route::post('/plugin-sites', [PluginSiteController::class, 'store']);
 });
 
 // Order management (authenticated users)
@@ -172,8 +176,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::apiResource('discounts', DiscountController::class);
 });
 
-Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {
+Route::middleware(['log.plugin.access', 'auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {
     Route::post('/plugin/orders', [PluginOrderController::class, 'store']);
+    Route::get('/plugin/products', [PluginProductController::class, 'index']);
+    Route::get('/plugin/products/inventory', [PluginProductController::class, 'inventory']);
+    Route::get('/plugin/products/{product}', [PluginProductController::class, 'show'])
+        ->whereNumber('product');
+    Route::get('/plugin/products/{product}/inventory', [PluginProductController::class, 'productInventory'])
+        ->whereNumber('product');
 });
 
 // Merchant routes (for merchants)
