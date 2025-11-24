@@ -2638,6 +2638,69 @@
           }
         },
         {
+          "name": "Plugin Categories - List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/categories?site_url={{plugin_site_url}}&with_products_only=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "categories"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "with_products_only",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Plugin Categories - Show",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/plugin/categories/{{plugin_category_id}}?site_url={{plugin_site_url}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "plugin",
+                "categories",
+                "{{plugin_category_id}}"
+              ],
+              "query": [
+                {
+                  "key": "site_url",
+                  "value": "{{plugin_site_url}}"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Plugin Products - List",
           "request": {
             "method": "GET",
@@ -2648,7 +2711,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/plugin/products?site_url={{plugin_site_url}}&per_page=50",
+              "raw": "{{base_url}}/api/plugin/products?site_url={{plugin_site_url}}&category_id={{plugin_category_id}}&per_page=50",
               "host": [
                 "{{base_url}}"
               ],
@@ -2661,6 +2724,10 @@
                 {
                   "key": "site_url",
                   "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{plugin_category_id}}"
                 },
                 {
                   "key": "per_page",
@@ -2681,7 +2748,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/plugin/products/{{product_id}}?site_url={{plugin_site_url}}",
+              "raw": "{{base_url}}/api/plugin/products/{{product_id}}?site_url={{plugin_site_url}}&category_id={{plugin_category_id}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2695,6 +2762,10 @@
                 {
                   "key": "site_url",
                   "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{plugin_category_id}}"
                 }
               ]
             }
@@ -2711,7 +2782,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/plugin/products/inventory?site_url={{plugin_site_url}}",
+              "raw": "{{base_url}}/api/plugin/products/inventory?site_url={{plugin_site_url}}&category_id={{plugin_category_id}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2725,6 +2796,10 @@
                 {
                   "key": "site_url",
                   "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{plugin_category_id}}"
                 }
               ]
             }
@@ -2741,7 +2816,7 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/plugin/products/{{product_id}}/inventory?site_url={{plugin_site_url}}",
+              "raw": "{{base_url}}/api/plugin/products/{{product_id}}/inventory?site_url={{plugin_site_url}}&category_id={{plugin_category_id}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -2756,6 +2831,10 @@
                 {
                   "key": "site_url",
                   "value": "{{plugin_site_url}}"
+                },
+                {
+                  "key": "category_id",
+                  "value": "{{plugin_category_id}}"
                 }
               ]
             }
@@ -2969,6 +3048,11 @@
     {
       "key": "plugin_site_url2",
       "value": "https://facebook.com",
+      "type": "string"
+    },
+    {
+      "key": "plugin_category_id",
+      "value": "1",
       "type": "string"
     },
     {

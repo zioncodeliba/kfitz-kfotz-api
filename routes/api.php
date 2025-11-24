@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\MerchantCustomerController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\PluginSiteController;
 use App\Http\Controllers\Api\PluginOrderController;
+use App\Http\Controllers\Api\PluginCategoryController;
 use App\Http\Controllers\Api\PluginProductController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
@@ -177,6 +178,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 
 Route::middleware(['log.plugin.access', 'auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {
+    Route::get('/plugin/categories', [PluginCategoryController::class, 'index']);
+    Route::get('/plugin/categories/{category}', [PluginCategoryController::class, 'show'])
+        ->whereNumber('category');
     Route::post('/plugin/orders', [PluginOrderController::class, 'store']);
     Route::get('/plugin/products', [PluginProductController::class, 'index']);
     Route::get('/plugin/products/inventory', [PluginProductController::class, 'inventory']);

@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\MerchantSite;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesPluginPricing;
+use App\Traits\ResolvesPluginSite;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -15,6 +16,7 @@ class PluginProductController extends Controller
 {
     use ApiResponse;
     use HandlesPluginPricing;
+    use ResolvesPluginSite;
 
     /**
      * Return a paginated list of products tailored for a specific plugin site.
@@ -24,6 +26,7 @@ class PluginProductController extends Controller
         $user = $request->user();
         $site = $this->resolveMerchantSiteOrFail($request, $user->id);
         $siteId = $site->id;
+        $category = $this->resolveCategoryOrFail($request);
 
         $perPage = (int) $request->query('per_page', 50);
         $perPage = max(1, min($perPage, 200));
@@ -41,6 +44,7 @@ class PluginProductController extends Controller
                 'category:id,name',
                 'productVariations:id,product_id,sku,inventory,price,attributes,image',
             ])
+            ->where('category_id', $category->id)
             ->orderByDesc('updated_at');
 
         if ($activeOnly) {
@@ -74,10 +78,15 @@ class PluginProductController extends Controller
 
         return $this->successResponse([
             'site' => $this->formatSitePayload($site),
+            'category' => [
+                'id' => $category->id,
+                'name' => $category->name,
+            ],
             'filters' => [
                 'search' => $search !== '' ? $search : null,
                 'active_only' => $activeOnly,
                 'in_stock_only' => $inStockOnly,
+                'category_id' => $category->id,
             ],
             'pagination' => [
                 'current_page' => $products->currentPage(),
@@ -96,11 +105,16 @@ class PluginProductController extends Controller
     {
         $user = $request->user();
         $site = $this->resolveMerchantSiteOrFail($request, $user->id);
+        $category = $this->resolveCategoryOrFail($request);
 
         $product->loadMissing([
             'category:id,name',
             'productVariations:id,product_id,sku,inventory,price,attributes,image',
         ]);
+
+        if ((int) $product->category_id !== $category->id) {
+            return $this->errorResponse('Product does not belong to the provided category.', 404);
+        }
 
         $payload = $this->formatProductPayload($product, $site->id);
 
@@ -121,14 +135,16 @@ class PluginProductController extends Controller
     {
         $user = $request->user();
         $site = $this->resolveMerchantSiteOrFail($request, $user->id);
+        $category = $this->resolveCategoryOrFail($request);
 
         $activeOnly = $request->has('active_only')
             ? $request->boolean('active_only')
             : true;
 
         $products = Product::query()
-            ->select(['id', 'name', 'sku', 'stock_quantity', 'is_active', 'updated_at'])
-            ->with(['productVariations:id,product_id,sku,inventory'])
+            ->select(['id', 'name', 'sku', 'images', 'stock_quantity', 'is_active', 'updated_at'])
+            ->with(['productVariations:id,product_id,sku,inventory,image'])
+            ->where('category_id', $category->id)
             ->when($activeOnly, function ($query) {
                 $query->where('is_active', true);
             })
@@ -144,8 +160,13 @@ class PluginProductController extends Controller
 
         return $this->successResponse([
             'site' => $this->formatSitePayload($site),
+            'category' => [
+                'id' => $category->id,
+                'name' => $category->name,
+            ],
             'filters' => [
                 'active_only' => $activeOnly,
+                'category_id' => $category->id,
             ],
             'generated_at' => now()->toIso8601String(),
             'items' => $products,
@@ -159,8 +180,13 @@ class PluginProductController extends Controller
     {
         $user = $request->user();
         $site = $this->resolveMerchantSiteOrFail($request, $user->id);
+        $category = $this->resolveCategoryOrFail($request);
 
-        $product->loadMissing(['productVariations:id,product_id,sku,inventory']);
+        $product->loadMissing(['productVariations:id,product_id,sku,inventory,image']);
+
+        if ((int) $product->category_id !== $category->id) {
+            return $this->errorResponse('Product does not belong to the provided category.', 404);
+        }
 
         return $this->successResponse([
             'site' => $this->formatSitePayload($site),
@@ -168,46 +194,27 @@ class PluginProductController extends Controller
         ]);
     }
 
-    protected function resolveMerchantSiteOrFail(Request $request, int $merchantUserId): MerchantSite
+    protected function resolveCategoryOrFail(Request $request): Category
     {
-        $siteId = (int) $request->query('site_id', 0);
-        $siteUrl = trim((string) $request->query('site_url', ''));
+        $categoryId = (int) $request->query('category_id', 0);
 
-        if ($siteId <= 0 && $siteUrl === '') {
+        if ($categoryId <= 0) {
             throw ValidationException::withMessages([
-                'site' => ['You must provide either site_id or site_url to target a plugin site.'],
+                'category_id' => ['You must provide a valid category_id.'],
             ]);
         }
 
-        $query = MerchantSite::where('user_id', $merchantUserId);
+        $category = Category::whereKey($categoryId)
+            ->where('is_active', true)
+            ->first();
 
-        if ($siteId > 0) {
-            $query->where('id', $siteId);
-        }
-
-        if ($siteUrl !== '') {
-            $query->where('site_url', $siteUrl);
-        }
-
-        $site = $query->first();
-
-        if (!$site) {
+        if (!$category) {
             throw ValidationException::withMessages([
-                'site' => ['Plugin site not found for the authenticated merchant.'],
+                'category_id' => ['Category not found or inactive.'],
             ]);
         }
 
-        return $site;
-    }
-
-    protected function formatSitePayload(MerchantSite $site): array
-    {
-        return [
-            'id' => $site->id,
-            'site_url' => $site->site_url,
-            'name' => $site->name,
-            'status' => $site->status,
-        ];
+        return $category;
     }
 
     protected function formatProductPayload(Product $product, int $siteId): array
@@ -250,6 +257,7 @@ class PluginProductController extends Controller
             'product_id' => $product->id,
             'name' => $product->name,
             'sku' => $product->sku,
+            'images' => $product->images ?? [],
             'stock_quantity' => (int) $product->stock_quantity,
             'is_active' => (bool) $product->is_active,
             'available_for_site' => $this->isProductAvailableForPluginSite($product, $siteId),
@@ -258,6 +266,7 @@ class PluginProductController extends Controller
                     'id' => $variation->id,
                     'sku' => $variation->sku,
                     'inventory' => (int) $variation->inventory,
+                    'image' => $variation->image,
                 ];
             })->values()->toArray(),
             'updated_at' => optional($product->updated_at)->toIso8601String(),
