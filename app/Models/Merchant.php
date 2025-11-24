@@ -133,12 +133,17 @@ class Merchant extends Model
             ->sum('total');
     }
 
-    public function getMonthlyOrders(): int
+    public function getMonthlyOrders(array $statuses = []): int
     {
-        return $this->orders()
+        $query = $this->orders()
             ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
+            ->whereYear('created_at', now()->year);
+
+        if (!empty($statuses)) {
+            $query->whereIn('status', $statuses);
+        }
+
+        return $query->count();
     }
 
     public function getPreviousMonthRevenue(): float

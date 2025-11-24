@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponse;
 use App\Models\Merchant;
+use App\Models\Order;
 use App\Models\User;
 use App\Models\Product;
 use App\Services\ShippingSettingsService;
@@ -213,9 +214,16 @@ class MerchantController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
+        $shippingFocusedStatuses = [
+            Order::STATUS_PENDING,
+            Order::STATUS_CONFIRMED,
+            Order::STATUS_PROCESSING,
+            Order::STATUS_SHIPPED,
+        ];
+
         // Add financial statistics
         $merchant->monthly_revenue = $merchant->getMonthlyRevenue();
-        $merchant->monthly_orders = $merchant->getMonthlyOrders();
+        $merchant->monthly_orders = $merchant->getMonthlyOrders($shippingFocusedStatuses);
         $merchant->previous_month_revenue = $merchant->getPreviousMonthRevenue();
         $merchant->previous_month_orders = $merchant->getPreviousMonthOrders();
         $merchant->outstanding_balance = $merchant->getOutstandingBalance();
@@ -403,9 +411,16 @@ class MerchantController extends Controller
         $lowStockCount = Product::lowStock()->count();
         $availableProductsCount = Product::inStock()->count();
 
+        $shippingFocusedStatuses = [
+            Order::STATUS_PENDING,
+            Order::STATUS_CONFIRMED,
+            Order::STATUS_PROCESSING,
+            Order::STATUS_SHIPPED,
+        ];
+
         $stats = [
             'monthly_revenue' => $merchant->getMonthlyRevenue(),
-            'monthly_orders' => $merchant->getMonthlyOrders(),
+            'monthly_orders' => $merchant->getMonthlyOrders($shippingFocusedStatuses),
             'previous_month_revenue' => $merchant->getPreviousMonthRevenue(),
             'previous_month_orders' => $merchant->getPreviousMonthOrders(),
             'outstanding_balance' => $merchant->getOutstandingBalance(),
