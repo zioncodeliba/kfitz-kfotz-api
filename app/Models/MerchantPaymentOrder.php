@@ -11,6 +11,7 @@ class MerchantPaymentOrder extends Model
         'payment_id',
         'order_id',
         'amount_applied',
+        'payment_month',
     ];
 
     protected $casts = [

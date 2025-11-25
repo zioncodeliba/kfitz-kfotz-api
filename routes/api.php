@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PluginProductController;
 use App\Http\Controllers\Api\ShippingCarrierController;
 use App\Http\Controllers\Api\SystemAlertController;
 use App\Http\Controllers\Api\MerchantPaymentController;
+use App\Http\Controllers\Api\MerchantPaymentSubmissionController;
 use App\Http\Controllers\Api\DiscountController;
 use App\Http\Controllers\Api\EmailTemplateController;
 use App\Http\Controllers\Api\EmailLogController;
@@ -108,6 +109,8 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
     Route::get('/plugin-sites', [PluginSiteController::class, 'index']);
     Route::post('/admin/merchants/{merchant}/payments', [MerchantPaymentController::class, 'store']);
+    Route::post('/admin/merchants/{merchant}/payments/approve-submissions', [MerchantPaymentController::class, 'approveFromSubmissions']);
+    Route::get('/admin/merchants/{merchant}/payment-submissions/pending', [MerchantPaymentSubmissionController::class, 'pendingForMerchant']);
 
     // Mail center
     Route::get('/email/templates', [EmailTemplateController::class, 'index']);
@@ -132,6 +135,10 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
 
 Route::middleware(['log.plugin.access', 'auth:sanctum', 'verified'])->group(function () {
     Route::post('/plugin-sites', [PluginSiteController::class, 'store']);
+});
+
+Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->group(function () {
+    Route::post('/merchant/payment-submissions', [MerchantPaymentSubmissionController::class, 'store']);
 });
 
 // Order management (authenticated users)

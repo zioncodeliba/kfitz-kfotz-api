@@ -13,6 +13,7 @@ class MerchantPayment extends Model
         'merchant_id',
         'amount',
         'currency',
+        'payment_month',
         'paid_at',
         'reference',
         'note',

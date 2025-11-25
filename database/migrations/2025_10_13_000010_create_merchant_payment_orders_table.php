@@ -16,11 +16,13 @@ return new class extends Migration
             $table->unsignedBigInteger('payment_id');
             $table->unsignedBigInteger('order_id');
             $table->decimal('amount_applied', 12, 2);
+            $table->string('payment_month', 7); // YYYY-MM
             $table->timestamps();
 
             $table->foreign('payment_id')->references('id')->on('merchant_payments')->onDelete('cascade');
             $table->foreign('order_id')->references('id')->on('orders')->onDelete('cascade');
             $table->unique(['payment_id', 'order_id']);
+            $table->index(['payment_month']);
         });
     }
 
