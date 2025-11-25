@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\MailBroadcastController;
 use App\Http\Controllers\Api\EmailListController;
 use App\Http\Controllers\Api\MerchantBannerController;
 use App\Http\Controllers\Api\MerchantPopupController;
+use App\Http\Controllers\Api\SystemSettingController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -40,6 +41,7 @@ Route::get('/products/{id}', [ProductController::class, 'show'])
     ->whereNumber('id');
 Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
 Route::get('/products/back-in-stock', [ProductController::class, 'backInStock']);
+Route::middleware(['auth:sanctum'])->get('/system-settings/shipping', [SystemSettingController::class, 'getShippingPricing']);
 
 // Email verification routes
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
@@ -68,6 +70,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     });
     Route::get('/admin/dashboard/alerts', [SystemAlertController::class, 'index']);
     Route::get('/admin/orders/summary', [OrderController::class, 'adminSummary']);
+    Route::put('/admin/system-settings/shipping', [SystemSettingController::class, 'updateShippingPricing']);
     
     // User management
     Route::get('/users', [UserController::class, 'index']);
