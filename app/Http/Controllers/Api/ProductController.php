@@ -214,6 +214,18 @@ class ProductController extends Controller
 
         $product->update($validated);
 
+        if ($wasOutOfStock && $product->stock_quantity > 0) {
+            $product->forceFill([
+                'restocked_at' => now(),
+                'restocked_initial_stock' => $product->stock_quantity,
+            ])->save();
+        } elseif ($product->stock_quantity <= 0 && ($product->restocked_at || $product->restocked_initial_stock)) {
+            $product->forceFill([
+                'restocked_at' => null,
+                'restocked_initial_stock' => null,
+            ])->save();
+        }
+
         if ($variationPayload !== null) {
             $this->syncProductVariations($product, $variationPayload);
         }
@@ -661,6 +673,33 @@ class ProductController extends Controller
     {
         $products = Product::with('category')
             ->lowStock()
+            ->get();
+
+        return $this->successResponse($products);
+    }
+
+    /**
+     * Get products that recently came back in stock and have not yet sold 10% of the restocked quantity.
+     */
+    public function backInStock()
+    {
+        $products = Product::query()
+            ->select([
+                'id',
+                'name',
+                'sku',
+                'stock_quantity',
+                'min_stock_alert',
+                'restocked_initial_stock',
+                'restocked_at',
+            ])
+            ->whereNotNull('restocked_at')
+            ->where('restocked_initial_stock', '>', 0)
+            ->where('stock_quantity', '>', 0)
+            ->whereRaw(
+                '(restocked_initial_stock - stock_quantity) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
+            )
+            ->orderByDesc('restocked_at')
             ->get();
 
         return $this->successResponse($products);

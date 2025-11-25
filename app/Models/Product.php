@@ -25,6 +25,8 @@ class Product extends Model
         'dimensions',
         'merchant_prices',
         'plugin_site_prices',
+        'restocked_initial_stock',
+        'restocked_at',
     ];
 
     protected $casts = [
@@ -36,6 +38,7 @@ class Product extends Model
         'variations' => 'array',
         'merchant_prices' => 'array',
         'plugin_site_prices' => 'array',
+        'restocked_at' => 'datetime',
     ];
 
     // Category relationship

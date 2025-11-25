@@ -18,6 +18,19 @@ class MerchantController extends Controller
 {
     use ApiResponse;
 
+    /**
+     * Order statuses counted toward monthly_orders metric.
+     *
+     * Pending/confirmed/processing cover "open" orders,
+     * and shipped covers "waiting/being delivered".
+     */
+    private array $monthlyOrderStatuses = [
+        Order::STATUS_PENDING,
+        Order::STATUS_CONFIRMED,
+        Order::STATUS_PROCESSING,
+        Order::STATUS_SHIPPED,
+    ];
+
     public function __construct(
         protected ShippingSettingsService $shippingSettingsService
     ) {
@@ -214,19 +227,13 @@ class MerchantController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
-        $shippingFocusedStatuses = [
-            Order::STATUS_PENDING,
-            Order::STATUS_CONFIRMED,
-            Order::STATUS_PROCESSING,
-            Order::STATUS_SHIPPED,
-        ];
-
         // Add financial statistics
         $merchant->monthly_revenue = $merchant->getMonthlyRevenue();
-        $merchant->monthly_orders = $merchant->getMonthlyOrders($shippingFocusedStatuses);
+        $merchant->monthly_orders = $merchant->getMonthlyOrders($this->monthlyOrderStatuses);
         $merchant->previous_month_revenue = $merchant->getPreviousMonthRevenue();
         $merchant->previous_month_orders = $merchant->getPreviousMonthOrders();
         $merchant->outstanding_balance = $merchant->getOutstandingBalance();
+        $merchant->back_in_stock_products = $this->getBackInStockCount($merchant->id);
 
         $merchant->setAttribute('credit_limit', $merchant->user?->order_limit);
         $merchant->setAttribute('balance', $merchant->user?->order_balance);
@@ -410,17 +417,11 @@ class MerchantController extends Controller
 
         $lowStockCount = Product::lowStock()->count();
         $availableProductsCount = Product::inStock()->count();
-
-        $shippingFocusedStatuses = [
-            Order::STATUS_PENDING,
-            Order::STATUS_CONFIRMED,
-            Order::STATUS_PROCESSING,
-            Order::STATUS_SHIPPED,
-        ];
+        $backInStockCount = $this->getBackInStockCount($merchant->id);
 
         $stats = [
             'monthly_revenue' => $merchant->getMonthlyRevenue(),
-            'monthly_orders' => $merchant->getMonthlyOrders($shippingFocusedStatuses),
+            'monthly_orders' => $merchant->getMonthlyOrders($this->monthlyOrderStatuses),
             'previous_month_revenue' => $merchant->getPreviousMonthRevenue(),
             'previous_month_orders' => $merchant->getPreviousMonthOrders(),
             'outstanding_balance' => $merchant->getOutstandingBalance(),
@@ -436,6 +437,7 @@ class MerchantController extends Controller
             'low_stock_products' => $lowStockCount,
             'available_products' => $availableProductsCount,
             'current_month_unpaid_orders' => $currentMonthOutstandingCount,
+            'back_in_stock_products' => $backInStockCount,
         ];
 
         $historicalOrdersQuery = $merchant->orders()->where('created_at', '<', $startOfCurrentMonth);
@@ -838,5 +840,18 @@ class MerchantController extends Controller
             $this->shippingSettingsService->buildPayload($merchant->refresh()),
             'Shipping settings updated successfully'
         );
+    }
+
+    protected function getBackInStockCount(?int $merchantUserId = null): int
+    {
+        // Currently products are not scoped per merchant; when ownership is added we can filter here.
+        return Product::query()
+            ->whereNotNull('restocked_at')
+            ->where('restocked_initial_stock', '>', 0)
+            ->where('stock_quantity', '>', 0)
+            ->whereRaw(
+                '(restocked_initial_stock - stock_quantity) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
+            )
+            ->count();
     }
 }

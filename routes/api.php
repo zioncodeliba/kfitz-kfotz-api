@@ -39,6 +39,7 @@ Route::get('/products/featured', [ProductController::class, 'featured']);
 Route::get('/products/{id}', [ProductController::class, 'show'])
     ->whereNumber('id');
 Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
+Route::get('/products/back-in-stock', [ProductController::class, 'backInStock']);
 
 // Email verification routes
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
