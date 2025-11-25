@@ -97,6 +97,11 @@ class Merchant extends Model
         return $this->hasMany(MerchantCustomer::class, 'merchant_user_id', 'user_id');
     }
 
+    public function payments(): HasMany
+    {
+        return $this->hasMany(MerchantPayment::class, 'merchant_id', 'user_id');
+    }
+
     // Status methods
     public function isActive(): bool
     {

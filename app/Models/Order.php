@@ -5,6 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\MerchantPayment;
+use App\Models\MerchantPaymentOrder;
 
 class Order extends Model
 {
@@ -98,6 +101,29 @@ class Order extends Model
     public function carrier(): BelongsTo
     {
         return $this->belongsTo(ShippingCarrier::class);
+    }
+
+    public function paymentAllocations(): HasMany
+    {
+        return $this->hasMany(MerchantPaymentOrder::class);
+    }
+
+    public function payments(): BelongsToMany
+    {
+        return $this->belongsToMany(MerchantPayment::class, 'merchant_payment_orders', 'order_id', 'payment_id')
+            ->withPivot('amount_applied')
+            ->withTimestamps();
+    }
+
+    public function getPaidAmountAttribute(): float
+    {
+        return (float) $this->paymentAllocations()->sum('amount_applied');
+    }
+
+    public function getOutstandingAmountAttribute(): float
+    {
+        $outstanding = (float) $this->total - $this->paid_amount;
+        return $outstanding > 0 ? $outstanding : 0.0;
     }
 
     // Status methods
