@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Traits\ApiResponse;
 use App\Models\Merchant;
+use App\Models\MerchantPayment;
+use App\Models\MerchantPaymentOrder;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\Product;
@@ -237,6 +239,47 @@ class MerchantController extends Controller
 
         $merchant->setAttribute('credit_limit', $merchant->user?->order_limit);
         $merchant->setAttribute('balance', $merchant->user?->order_balance);
+
+        $paymentsQuery = MerchantPayment::where('merchant_id', $merchant->user_id);
+
+        $latestPayment = (clone $paymentsQuery)
+            ->orderByDesc('paid_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $paymentsTotals = (clone $paymentsQuery)
+            ->selectRaw('COALESCE(SUM(amount), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(applied_amount), 0) as total_applied_amount')
+            ->selectRaw('COALESCE(SUM(remaining_credit), 0) as total_remaining_credit')
+            ->selectRaw('COUNT(*) as payments_count')
+            ->first();
+
+        $paymentIds = (clone $paymentsQuery)->pluck('id');
+        $allocationsCount = $paymentIds->isNotEmpty()
+            ? MerchantPaymentOrder::whereIn('payment_id', $paymentIds)->count()
+            : 0;
+
+        if ($paymentsTotals) {
+            $merchant->setAttribute('payments_summary', [
+                'total_amount' => (float) ($paymentsTotals->total_amount ?? 0),
+                'total_applied_amount' => (float) ($paymentsTotals->total_applied_amount ?? 0),
+                'total_remaining_credit' => (float) ($paymentsTotals->total_remaining_credit ?? 0),
+                'payments_count' => (int) ($paymentsTotals->payments_count ?? 0),
+                'allocations_count' => (int) $allocationsCount,
+            ]);
+        }
+
+        if ($latestPayment) {
+            $allocationsCountForLatest = MerchantPaymentOrder::where('payment_id', $latestPayment->id)->count();
+            $merchant->setAttribute('latest_payment', [
+                'id' => $latestPayment->id,
+                'amount' => (float) $latestPayment->amount,
+                'applied_amount' => (float) $latestPayment->applied_amount,
+                'remaining_credit' => (float) $latestPayment->remaining_credit,
+                'allocations_count' => $allocationsCountForLatest,
+                'paid_at' => optional($latestPayment->paid_at)->toDateTimeString(),
+            ]);
+        }
 
         return $this->successResponse($merchant);
     }

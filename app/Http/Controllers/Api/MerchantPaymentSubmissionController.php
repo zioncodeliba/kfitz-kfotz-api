@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Merchant;
 use App\Models\MerchantPaymentSubmission;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -49,12 +50,12 @@ class MerchantPaymentSubmissionController extends Controller
             return response()->json(['message' => 'אין הרשאה.'], 403);
         }
 
-        $merchant = User::where('id', $merchantId)->where('role', 'merchant')->first();
-        if (!$merchant) {
+        [$merchantUser] = $this->resolveMerchantContext($merchantId);
+        if (!$merchantUser) {
             return response()->json(['message' => 'סוחר לא נמצא.'], 404);
         }
 
-        $submissions = MerchantPaymentSubmission::where('merchant_id', $merchant->id)
+        $submissions = MerchantPaymentSubmission::where('merchant_id', $merchantUser->id)
             ->where('status', 'pending')
             ->orderByDesc('submitted_at')
             ->get([
@@ -78,5 +79,32 @@ class MerchantPaymentSubmissionController extends Controller
                 'submissions' => $submissions,
             ],
         ]);
+    }
+
+    /**
+     * Resolve merchant by accepting merchant model id or merchant user id.
+     */
+    private function resolveMerchantContext(int $merchant): array
+    {
+        $merchantProfile = Merchant::with('user')
+            ->where(function ($query) use ($merchant) {
+                $query->where('id', $merchant)
+                    ->orWhere('user_id', $merchant);
+            })
+            ->first();
+
+        if ($merchantProfile && $merchantProfile->user && $merchantProfile->user->role === 'merchant') {
+            return [$merchantProfile->user, $merchantProfile];
+        }
+
+        $merchantUser = User::where('id', $merchant)
+            ->where('role', 'merchant')
+            ->first();
+
+        if ($merchantUser) {
+            return [$merchantUser, Merchant::where('user_id', $merchantUser->id)->first()];
+        }
+
+        return [null, null];
     }
 }

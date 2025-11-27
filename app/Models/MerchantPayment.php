@@ -12,16 +12,22 @@ class MerchantPayment extends Model
     protected $fillable = [
         'merchant_id',
         'amount',
+        'applied_amount',
+        'remaining_credit',
         'currency',
         'payment_month',
         'paid_at',
         'reference',
         'note',
         'created_by',
+        'payment_method',
+        'receipt_url',
     ];
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'applied_amount' => 'decimal:2',
+        'remaining_credit' => 'decimal:2',
         'paid_at' => 'datetime',
     ];
 

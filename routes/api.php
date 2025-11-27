@@ -184,6 +184,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/merchant-banners/{merchantBanner}', [MerchantBannerController::class, 'destroy'])
         ->whereNumber('merchantBanner');
 
+    Route::get('/merchant/payments/history', [MerchantPaymentController::class, 'history']);
+    Route::get('/merchant/payments/monthly-summary', [MerchantPaymentController::class, 'monthlySummary']);
+
     Route::get('/merchant-popup/settings', [MerchantPopupController::class, 'show']);
     Route::put('/merchant-popup/settings', [MerchantPopupController::class, 'update']);
 
