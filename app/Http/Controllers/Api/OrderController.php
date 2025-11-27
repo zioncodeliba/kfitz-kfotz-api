@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -1131,6 +1132,164 @@ class OrderController extends Controller
     }
 
     /**
+     * Update order items and recalculate totals.
+     */
+    public function updateItems(Request $request, string $id)
+    {
+        $order = Order::with('items')->findOrFail($id);
+        $user = $request->user();
+
+        // Permissions: admins always, merchants only their orders, agents according to scope
+        if ($user->hasRole('admin')) {
+            // allowed
+        } elseif ($user->hasRole('merchant')) {
+            if ($order->merchant_id !== $user->id) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } elseif ($user->hasRole('agent')) {
+            if (!$this->agentCanAccessOrder($user, $order)) {
+                return $this->errorResponse('Unauthorized', 403);
+            }
+        } else {
+            return $this->errorResponse('Unauthorized', 403);
+        }
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:products,id',
+            'items.*.variation_id' => 'nullable|integer|exists:product_variations,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'shipping_cost' => 'nullable|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Restore previous stock
+            foreach ($order->items as $existingItem) {
+                if ($existingItem->product_id) {
+                    $product = Product::find($existingItem->product_id);
+                    if ($product) {
+                        $product->increment('stock_quantity', $existingItem->quantity);
+                    }
+                }
+
+                $existingVariationId = $existingItem->product_data['variation']['id'] ?? null;
+                if ($existingVariationId) {
+                    $variation = ProductVariation::find($existingVariationId);
+                    if ($variation && $variation->inventory !== null) {
+                        $variation->increment('inventory', $existingItem->quantity);
+                    }
+                }
+            }
+
+            $order->items()->delete();
+
+            $subtotal = 0.0;
+            $productsToRefresh = [];
+
+            foreach ($validated['items'] as $itemData) {
+                /** @var Product $product */
+                $product = Product::findOrFail($itemData['product_id']);
+                $quantity = (int) $itemData['quantity'];
+                $variation = null;
+
+                if (!empty($itemData['variation_id'])) {
+                    $variation = ProductVariation::find($itemData['variation_id']);
+                    if (!$variation || $variation->product_id !== $product->id) {
+                        throw ValidationException::withMessages([
+                            'items' => ['Variation does not belong to the selected product'],
+                        ]);
+                    }
+                }
+
+                if ($product->stock_quantity !== null && $product->stock_quantity < $quantity) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient stock for {$product->name}"],
+                    ]);
+                }
+
+                if ($variation && $variation->inventory !== null && $variation->inventory < $quantity) {
+                    throw ValidationException::withMessages([
+                        'items' => ["Insufficient variation stock for {$product->name}"],
+                    ]);
+                }
+
+                $unitPrice = (float) ($variation && $variation->price !== null
+                    ? $variation->price
+                    : ($product->sale_price ?? $product->price ?? 0));
+                $lineTotal = round($unitPrice * $quantity, 2);
+
+                $productData = [
+                    'description' => $product->description,
+                    'images' => $product->images,
+                ];
+
+                if ($variation) {
+                    $productData['variation'] = [
+                        'id' => $variation->id,
+                        'sku' => $variation->sku,
+                        'attributes' => $variation->attributes,
+                        'image' => $variation->image,
+                    ];
+                }
+
+                $order->items()->create([
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'product_sku' => $variation?->sku ?? $product->sku,
+                    'quantity' => $quantity,
+                    'unit_price' => $unitPrice,
+                    'total_price' => $lineTotal,
+                    'product_data' => $productData,
+                ]);
+
+                $product->decrement('stock_quantity', $quantity);
+                if ($variation && $variation->inventory !== null) {
+                    $variation->decrement('inventory', $quantity);
+                }
+
+                $productsToRefresh[$product->id] = $product;
+                $subtotal += $lineTotal;
+            }
+
+            foreach ($productsToRefresh as $productToRefresh) {
+                $this->refreshProductVariationsSnapshot($productToRefresh);
+            }
+
+            $subtotal = round($subtotal, 2);
+            $tax = round($subtotal * 0.17, 2);
+            $shippingCost = array_key_exists('shipping_cost', $validated)
+                ? max(0, (float) $validated['shipping_cost'])
+                : (float) ($order->shipping_cost ?? 0);
+            $shippingCost = round($shippingCost, 2);
+            $discount = (float) ($order->discount ?? 0);
+            $total = round($subtotal + $tax + $shippingCost - $discount, 2);
+
+            $order->update([
+                'subtotal' => $subtotal,
+                'tax' => $tax,
+                'shipping_cost' => $shippingCost,
+                'total' => $total,
+            ]);
+
+            $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
+
+            DB::commit();
+
+            return $this->successResponse($order, 'Order items updated successfully');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Failed to update order items', [
+                'order_id' => $order->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(Request $request, string $id)
@@ -1716,6 +1875,17 @@ class OrderController extends Controller
                 'shipping_address' => $order->shipping_address,
                 'billing_address' => $order->billing_address,
                 'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
+                'items' => $order->items->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'product_sku' => $item->product_sku,
+                        'quantity' => $item->quantity,
+                        'price' => $item->unit_price,
+                        'total' => $item->total_price,
+                    ];
+                }),
             ],
             'merchant' => $merchant ? [
                 'id' => $merchant->id,

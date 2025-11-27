@@ -150,6 +150,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::put('/orders/{id}', [OrderController::class, 'update']);
+    Route::put('/orders/{id}/items', [OrderController::class, 'updateItems']);
     Route::delete('/orders/{id}', [OrderController::class, 'destroy']);
     Route::get('/orders/status/{status}', [OrderController::class, 'byStatus']);
     Route::get('/orders/dashboard/stats', [OrderController::class, 'dashboard']);

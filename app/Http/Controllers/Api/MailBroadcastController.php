@@ -22,6 +22,8 @@ class MailBroadcastController extends Controller
             'merchant_ids.*' => 'integer|exists:users,id',
             'customer_ids' => 'nullable|array',
             'customer_ids.*' => 'integer|exists:merchant_customers,id',
+            'emails' => 'nullable|array',
+            'emails.*' => 'email',
         ]);
 
         $merchantIds = collect($data['merchant_ids'] ?? [])
@@ -36,13 +38,27 @@ class MailBroadcastController extends Controller
             ->unique()
             ->values();
 
-        if ($merchantIds->isEmpty() && $customerIds->isEmpty()) {
+        $manualEmails = collect($data['emails'] ?? [])
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($merchantIds->isEmpty() && $customerIds->isEmpty() && $manualEmails->isEmpty()) {
             return $this->validationErrorResponse([
                 'recipients' => ['יש לבחור לפחות נמען אחד לשליחה'],
             ]);
         }
 
         $recipients = [];
+
+        foreach ($manualEmails as $email) {
+            $recipients[] = [
+                'email' => $email,
+                'name' => null,
+                'type' => 'manual',
+                'context' => [],
+            ];
+        }
 
         if ($merchantIds->isNotEmpty()) {
             $merchants = User::query()
