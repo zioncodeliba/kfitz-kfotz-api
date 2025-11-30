@@ -81,6 +81,42 @@ class MerchantPaymentSubmissionController extends Controller
         ]);
     }
 
+    public function adminStore(Request $request, int $merchantId): JsonResponse
+    {
+        $admin = $request->user();
+        if (!$admin || $admin->role !== 'admin') {
+            return response()->json(['message' => 'אין הרשאה.'], 403);
+        }
+
+        [$merchantUser] = $this->resolveMerchantContext($merchantId);
+        if (!$merchantUser) {
+            return response()->json(['message' => 'סוחר לא נמצא.'], 404);
+        }
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'currency' => ['nullable', 'string', 'size:3'],
+            'reference' => ['nullable', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $submission = MerchantPaymentSubmission::create([
+            'merchant_id' => $merchantUser->id,
+            'amount' => $validated['amount'],
+            'currency' => strtoupper($validated['currency'] ?? 'ILS'),
+            'payment_month' => Carbon::now()->format('Y-m'),
+            'status' => 'pending',
+            'reference' => $validated['reference'] ?? 'admin_credit',
+            'note' => $validated['note'] ?? null,
+            'submitted_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'היתרה נוספה וממתינה לאישור.',
+            'data' => $submission,
+        ], 201);
+    }
+
     /**
      * Resolve merchant by accepting merchant model id or merchant user id.
      */

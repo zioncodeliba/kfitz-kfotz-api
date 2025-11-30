@@ -198,7 +198,7 @@ class MerchantPaymentController extends Controller
         $validated = $request->validate([
             'order_ids' => ['nullable', 'array'],
             'order_ids.*' => ['integer'],
-            'submission_ids' => ['required', 'array', 'min:1'],
+            'submission_ids' => ['nullable', 'array'],
             'submission_ids.*' => ['integer'],
             'credit_only' => ['nullable', 'boolean'],
         ]);
@@ -225,14 +225,104 @@ class MerchantPaymentController extends Controller
             }
 
             $submissions = $submissionQuery->lockForUpdate()->get();
+            $orderIdsInput = $validated['order_ids'] ?? [];
+            $creditOnly = (bool) ($validated['credit_only'] ?? false);
+
+            $orders = !empty($orderIdsInput)
+                ? Order::whereIn('id', $orderIdsInput)
+                    ->where('merchant_id', $merchantUser->id)
+                    ->orderBy('created_at')
+                    ->lockForUpdate()
+                    ->get()
+                : collect();
+
+            // Allow using existing credit without submissions
+            if ($submissions->isEmpty() && $creditOnly) {
+                if ($orders->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'order_ids' => 'לא נמצאו הזמנות תואמות לסוחר.',
+                    ]);
+                }
+
+                $creditBalances = MerchantPayment::where('merchant_id', $merchantUser->id)
+                    ->where('remaining_credit', '>', 0)
+                    ->orderBy('paid_at')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($creditBalances->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'credit_only' => 'אין יתרת אשראי זמינה להקצאה.',
+                    ]);
+                }
+
+                $allocations = [];
+                $paymentMonth = Carbon::now()->format('Y-m');
+
+                foreach ($orders as $order) {
+                    $alreadyPaid = (float) ($order->paymentAllocations()->sum('amount_applied') ?? 0);
+                    $outstanding = max(0, (float) $order->total - $alreadyPaid);
+                    if ($outstanding <= 0) {
+                        continue;
+                    }
+
+                    foreach ($creditBalances as $creditPayment) {
+                        if ($outstanding <= 0) {
+                            break;
+                        }
+                        $available = (float) $creditPayment->remaining_credit;
+                        if ($available <= 0) {
+                            continue;
+                        }
+
+                        $use = min($available, $outstanding);
+
+                        MerchantPaymentOrder::create([
+                            'payment_id' => $creditPayment->id,
+                            'order_id' => $order->id,
+                            'amount_applied' => $use,
+                            'payment_month' => $paymentMonth,
+                        ]);
+
+                        $creditPayment->remaining_credit = round($creditPayment->remaining_credit - $use, 2);
+                        $creditPayment->applied_amount = round(($creditPayment->applied_amount ?? 0) + $use, 2);
+                        $creditPayment->save();
+
+                        $outstanding -= $use;
+                        $allocations[] = [
+                            'order_id' => $order->id,
+                            'order_number' => $order->order_number,
+                            'applied_amount' => round($use, 2),
+                            'payment_id' => $creditPayment->id,
+                        ];
+                    }
+
+                    if ($outstanding <= 0) {
+                        $order->payment_status = 'paid';
+                        $order->save();
+                    }
+                }
+
+                $profile = $merchantProfile ?? Merchant::where('user_id', $merchantUser->id)->first();
+                if ($profile) {
+                    $profile->last_payment_at = Carbon::now();
+                    $profile->save();
+                }
+
+                return [
+                    'payment' => null,
+                    'allocations' => $allocations,
+                    'approved_submissions' => [],
+                    'remaining_credit' => (float) MerchantPayment::where('merchant_id', $merchantUser->id)->sum('remaining_credit'),
+                ];
+            }
+
             if ($submissions->isEmpty()) {
                 throw ValidationException::withMessages([
                     'submission_ids' => 'לא נמצאו תשלומים ממתינים לאישור.',
                 ]);
             }
-
-            $orderIdsInput = $validated['order_ids'] ?? [];
-            $creditOnly = (bool) ($validated['credit_only'] ?? false);
 
             $existingCredits = MerchantPayment::where('merchant_id', $merchantUser->id)
                 ->where('remaining_credit', '>', 0)
@@ -244,14 +334,6 @@ class MerchantPaymentController extends Controller
             $totalReceived = $submissions->sum('amount');
             $paymentMonth = $submissions->first()->payment_month ?? Carbon::now()->format('Y-m');
             $paidAt = $submissions->first()->submitted_at ?? now();
-
-            $orders = !empty($orderIdsInput)
-                ? Order::whereIn('id', $orderIdsInput)
-                    ->where('merchant_id', $merchantUser->id)
-                    ->orderBy('created_at')
-                    ->lockForUpdate()
-                    ->get()
-                : collect();
 
             if ($orders->isEmpty() && !$creditOnly) {
                 throw ValidationException::withMessages([

@@ -111,6 +111,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::post('/admin/merchants/{merchant}/payments', [MerchantPaymentController::class, 'store']);
     Route::post('/admin/merchants/{merchant}/payments/approve-submissions', [MerchantPaymentController::class, 'approveFromSubmissions']);
     Route::get('/admin/merchants/{merchant}/payment-submissions/pending', [MerchantPaymentSubmissionController::class, 'pendingForMerchant']);
+    Route::post('/admin/merchants/{merchant}/payment-submissions', [MerchantPaymentSubmissionController::class, 'adminStore']);
 
     // Mail center
     Route::get('/email/templates', [EmailTemplateController::class, 'index']);
