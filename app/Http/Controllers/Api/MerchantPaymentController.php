@@ -196,10 +196,11 @@ class MerchantPaymentController extends Controller
     public function approveFromSubmissions(Request $request, int $merchant): JsonResponse
     {
         $validated = $request->validate([
-            'order_ids' => ['required', 'array', 'min:1'],
+            'order_ids' => ['nullable', 'array'],
             'order_ids.*' => ['integer'],
-            'submission_ids' => ['nullable', 'array'],
+            'submission_ids' => ['required', 'array', 'min:1'],
             'submission_ids.*' => ['integer'],
+            'credit_only' => ['nullable', 'boolean'],
         ]);
 
         $admin = $request->user();
@@ -230,6 +231,9 @@ class MerchantPaymentController extends Controller
                 ]);
             }
 
+            $orderIdsInput = $validated['order_ids'] ?? [];
+            $creditOnly = (bool) ($validated['credit_only'] ?? false);
+
             $existingCredits = MerchantPayment::where('merchant_id', $merchantUser->id)
                 ->where('remaining_credit', '>', 0)
                 ->orderBy('paid_at')
@@ -241,13 +245,15 @@ class MerchantPaymentController extends Controller
             $paymentMonth = $submissions->first()->payment_month ?? Carbon::now()->format('Y-m');
             $paidAt = $submissions->first()->submitted_at ?? now();
 
-            $orders = Order::whereIn('id', $validated['order_ids'])
-                ->where('merchant_id', $merchantUser->id)
-                ->orderBy('created_at')
-                ->lockForUpdate()
-                ->get();
+            $orders = !empty($orderIdsInput)
+                ? Order::whereIn('id', $orderIdsInput)
+                    ->where('merchant_id', $merchantUser->id)
+                    ->orderBy('created_at')
+                    ->lockForUpdate()
+                    ->get()
+                : collect();
 
-            if ($orders->isEmpty()) {
+            if ($orders->isEmpty() && !$creditOnly) {
                 throw ValidationException::withMessages([
                     'order_ids' => 'לא נמצאו הזמנות תואמות לסוחר.',
                 ]);
@@ -263,7 +269,33 @@ class MerchantPaymentController extends Controller
                 'reference' => 'אישור תשלום ממתין',
                 'applied_amount' => 0,
                 'remaining_credit' => 0,
+                'payment_method' => $submissions->first()->payment_method ?? null,
             ]);
+
+            if ($creditOnly) {
+                MerchantPaymentSubmission::whereIn('id', $submissions->pluck('id'))
+                    ->update([
+                        'status' => 'approved',
+                        'approved_at' => now(),
+                        'approved_by' => $admin->id,
+                    ]);
+
+                $payment->remaining_credit = round($totalReceived, 2);
+                $payment->save();
+
+                $profile = $merchantProfile ?? Merchant::where('user_id', $merchantUser->id)->first();
+                if ($profile) {
+                    $profile->last_payment_at = $payment->paid_at;
+                    $profile->save();
+                }
+
+                return [
+                    'payment' => $payment,
+                    'allocations' => [],
+                    'approved_submissions' => $submissions->pluck('id'),
+                    'remaining_credit' => round($totalReceived, 2),
+                ];
+            }
 
             $existingAllocations = MerchantPaymentOrder::whereIn('order_id', $orders->pluck('id'))
                 ->selectRaw('order_id, SUM(amount_applied) as paid')
