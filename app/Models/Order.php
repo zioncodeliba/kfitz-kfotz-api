@@ -62,6 +62,11 @@ class Order extends Model
         'source_metadata' => 'array',
     ];
 
+    protected $appends = [
+        'payment_methods',
+        'payment_method',
+    ];
+
     // Relationships
     public function user(): BelongsTo
     {
@@ -124,6 +129,27 @@ class Order extends Model
     {
         $outstanding = (float) $this->total - $this->paid_amount;
         return $outstanding > 0 ? $outstanding : 0.0;
+    }
+
+    public function getPaymentMethodsAttribute(): array
+    {
+        if (!$this->relationLoaded('payments')) {
+            return [];
+        }
+
+        return $this->payments
+            ->pluck('payment_method')
+            ->filter(fn ($method) => $method !== null && trim((string) $method) !== '')
+            ->map(fn ($method) => trim((string) $method))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function getPaymentMethodAttribute(): ?string
+    {
+        $methods = $this->payment_methods;
+        return $methods[0] ?? null;
     }
 
     // Status methods

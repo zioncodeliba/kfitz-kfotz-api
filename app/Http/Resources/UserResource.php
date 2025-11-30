@@ -42,11 +42,15 @@ class UserResource extends JsonResource
             }),
             'orders' => $this->whenLoaded('orders', function () {
                 return $this->orders->map(function ($order) {
+                    $paymentMethods = is_array($order->payment_methods) ? $order->payment_methods : [];
+
                     return [
                         'id' => $order->id,
                         'order_number' => $order->order_number,
                         'status' => $order->status,
                         'payment_status' => $order->payment_status,
+                        'payment_methods' => $paymentMethods,
+                        'payment_method' => $paymentMethods[0] ?? null,
                         'total' => $order->total,
                         'created_at' => $order->created_at,
                         'updated_at' => $order->updated_at,

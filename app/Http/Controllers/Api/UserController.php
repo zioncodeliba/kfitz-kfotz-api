@@ -109,7 +109,12 @@ class UserController extends Controller
                 'agentMerchants',
                 'orders' => function ($ordersQuery) {
                     $ordersQuery
-                        ->with(['items.product:id,name,sku'])
+                        ->with([
+                            'items.product:id,name,sku',
+                            'payments' => function ($paymentQuery) {
+                                $paymentQuery->select('merchant_payments.id', 'merchant_payments.payment_method');
+                            },
+                        ])
                         ->orderBy('created_at', 'desc');
                 },
             ])

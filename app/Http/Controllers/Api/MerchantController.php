@@ -92,6 +92,31 @@ class MerchantController extends Controller
                 $merchant->setAttribute('balance', $merchant->user->order_balance);
             }
 
+            $startOfCurrentMonth = Carbon::now()->startOfMonth();
+            $endOfCurrentMonth = $startOfCurrentMonth->copy()->endOfMonth();
+
+            $pastDueTotal = $merchant->orders()
+                ->where('created_at', '<', $startOfCurrentMonth)
+                ->where(function ($query) {
+                    $query->whereNull('payment_status')
+                        ->orWhere('payment_status', '!=', 'paid');
+                })
+                ->whereNotIn('status', ['cancelled', 'canceled'])
+                ->sum('total');
+
+            $merchant->setAttribute('past_due_total', round($pastDueTotal, 2));
+
+            $currentMonthUnpaid = $merchant->orders()
+                ->whereBetween('created_at', [$startOfCurrentMonth, $endOfCurrentMonth])
+                ->where(function ($query) {
+                    $query->whereNull('payment_status')
+                        ->orWhere('payment_status', '!=', 'paid');
+                })
+                ->whereNotIn('status', ['cancelled', 'canceled'])
+                ->sum('total');
+
+            $merchant->setAttribute('current_month_unpaid_total', round($currentMonthUnpaid, 2));
+
             return $merchant;
         });
 
@@ -216,7 +241,21 @@ class MerchantController extends Controller
     public function show(Request $request, string $id)
     {
         $user = $request->user();
-        $merchant = Merchant::with(['user', 'agent', 'pluginSites', 'orders'])->findOrFail($id);
+        $merchant = Merchant::with([
+                'user',
+                'agent',
+                'pluginSites',
+                'orders' => function ($ordersQuery) {
+                    $ordersQuery
+                        ->with([
+                            'payments' => function ($paymentQuery) {
+                                $paymentQuery->select('merchant_payments.id', 'merchant_payments.payment_method');
+                            },
+                        ])
+                        ->orderByDesc('created_at');
+                },
+            ])
+            ->findOrFail($id);
 
         // Check permissions
         if ($user->hasRole('admin')) {
