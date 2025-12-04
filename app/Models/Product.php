@@ -14,6 +14,8 @@ class Product extends Model
         'sku',
         'price',
         'sale_price',
+        'cost_price',
+        'shipping_price',
         'stock_quantity',
         'min_stock_alert',
         'category_id',
@@ -32,6 +34,8 @@ class Product extends Model
     protected $casts = [
         'price' => 'decimal:2',
         'sale_price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'shipping_price' => 'decimal:2',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'images' => 'array',
