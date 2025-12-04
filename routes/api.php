@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmailVerificationController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
+use App\Http\Controllers\Api\InventorySyncController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\MerchantController;
 use App\Http\Controllers\Api\MerchantCustomerController;
@@ -94,6 +95,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::delete('/products/{id}', [ProductController::class, 'destroy'])
         ->whereNumber('id');
     Route::post('/product-images', [ProductController::class, 'uploadImage']);
+    Route::post('/admin/products/sync-inventory', [InventorySyncController::class, 'sync']);
     
     // Shipping carrier management (admin only)
     Route::get('/shipping-carriers', [ShippingCarrierController::class, 'index']);

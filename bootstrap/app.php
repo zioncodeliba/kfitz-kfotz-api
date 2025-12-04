@@ -5,6 +5,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Console\Commands\UpdateShipmentStatuses;
+use App\Console\Commands\SyncCashcowInventory;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         UpdateShipmentStatuses::class,
+        SyncCashcowInventory::class,
     ])
    ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
@@ -25,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('shipments:update-statuses')->everyFiveMinutes();
+        $schedule->command('cashcow:sync-inventory')->everyTenMinutes();
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
