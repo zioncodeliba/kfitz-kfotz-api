@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\CashcowInventorySyncService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
@@ -16,6 +17,7 @@ class SyncCashcowInventory extends Command
     public function handle(CashcowInventorySyncService $syncService): int
     {
         $logLines = [];
+        Log::info('Cashcow inventory sync started');
 
         try {
             $result = $syncService->sync(function (array $event) use (&$logLines) {
@@ -28,6 +30,7 @@ class SyncCashcowInventory extends Command
                         );
                         $this->info($line);
                         $logLines[] = $line;
+                        Log::info('[Cashcow] ' . $line);
                         break;
                     case 'product':
                         $line = sprintf(
@@ -37,6 +40,7 @@ class SyncCashcowInventory extends Command
                         );
                         $this->line($line);
                         $logLines[] = $line;
+                        Log::info('[Cashcow] ' . $line);
                         break;
                     case 'variation':
                         $line = sprintf(
@@ -49,12 +53,14 @@ class SyncCashcowInventory extends Command
                         );
                         $this->line($line);
                         $logLines[] = $line;
+                        Log::info('[Cashcow] ' . $line);
                         break;
                 }
             });
         } catch (Throwable $e) {
             $this->error('Sync failed: ' . $e->getMessage());
             report($e);
+            Log::error('Cashcow inventory sync failed', ['exception' => $e]);
             $this->sendReport($logLines, [
                 'status' => 'failed',
                 'error' => $e->getMessage(),
@@ -71,9 +77,11 @@ class SyncCashcowInventory extends Command
         );
 
         $this->info($summary);
+        Log::info('[Cashcow] ' . $summary);
 
         if (!empty($result['missing_products'])) {
             $this->line('Missing SKUs: ' . implode(', ', $result['missing_products']));
+            Log::warning('[Cashcow] Missing SKUs', ['missing' => $result['missing_products']]);
         }
 
         $this->sendReport($logLines, [
@@ -89,6 +97,7 @@ class SyncCashcowInventory extends Command
     {
         $email = config('cashcow.notify_email');
         if (empty($email)) {
+            Log::warning('[Cashcow] notify_email not configured; skipping report', ['meta' => $meta]);
             return;
         }
 
@@ -110,5 +119,10 @@ class SyncCashcowInventory extends Command
             $message->to($email)
                 ->subject(sprintf('[Cashcow Sync] %s (%s)', ucfirst($status), now()->toDateTimeString()));
         });
+
+        Log::info('[Cashcow] report email dispatched', [
+            'to' => $email,
+            'status' => $meta['status'] ?? 'unknown',
+        ]);
     }
 }

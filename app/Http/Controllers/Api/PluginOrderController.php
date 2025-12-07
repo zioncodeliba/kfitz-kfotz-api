@@ -9,6 +9,7 @@ use App\Models\MerchantSite;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariation;
+use App\Models\SystemSetting;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesPluginPricing;
 use Illuminate\Http\Request;
@@ -224,7 +225,8 @@ class PluginOrderController extends Controller
                 $subtotal = 0;
             }
 
-            $tax = (float) ($totalsInput['tax'] ?? round($subtotal * 0.17, 2));
+            $vatRate = $this->getVatRate();
+            $tax = (float) ($totalsInput['tax'] ?? round($subtotal * $vatRate, 2));
             if ($tax < 0) {
                 $tax = 0;
             }
@@ -572,5 +574,28 @@ class PluginOrderController extends Controller
         ])->save();
 
         $product->setRelation('productVariations', $collection);
+    }
+
+    /**
+     * Resolve VAT rate from system settings (shipping_pricing.vat_rate) with a default of 17%.
+     */
+    protected function getVatRate(): float
+    {
+        $setting = SystemSetting::where('key', 'shipping_pricing')->first();
+        $value = is_array($setting?->value) ? $setting->value : [];
+        $vat = $value['vat_rate'] ?? null;
+
+        if (is_numeric($vat)) {
+            $rate = (float) $vat;
+            if ($rate < 0) {
+                return 0.0;
+            }
+            if ($rate > 1) {
+                return 1.0;
+            }
+            return $rate;
+        }
+
+        return 0.17;
     }
 }

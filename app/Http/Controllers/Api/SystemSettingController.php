@@ -25,6 +25,7 @@ class SystemSettingController extends Controller
         $data = $request->validate([
             'store' => 'required|numeric|min:0',
             'courier' => 'required|numeric|min:0',
+            'vat_rate' => 'required|numeric|min:0|max:1',
         ]);
 
         $setting = SystemSetting::updateOrCreate(
@@ -43,6 +44,7 @@ class SystemSettingController extends Controller
         return [
             'store' => $this->normalizePrice($value['store'] ?? null),
             'courier' => $this->normalizePrice($value['courier'] ?? null),
+            'vat_rate' => $this->normalizeVatRate($value['vat_rate'] ?? null),
         ];
     }
 
@@ -53,6 +55,23 @@ class SystemSettingController extends Controller
         }
 
         return 0.0;
+    }
+
+    protected function normalizeVatRate($value): float
+    {
+        if (is_numeric($value)) {
+            $rate = (float) $value;
+            if ($rate < 0) {
+                return 0.0;
+            }
+            if ($rate > 1) {
+                return 1.0;
+            }
+            return $rate;
+        }
+
+        // Default VAT to 17%
+        return 0.17;
     }
 
     protected function authorizeAdmin(Request $request): void

@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\ShippingCarrier;
 use App\Models\Shipment;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\Discount;
 use App\Models\Merchant;
@@ -373,7 +374,8 @@ class OrderController extends Controller
             $storewideDiscountTotal = round($storewideDiscountTotal, 2);
 
             // Calculate totals
-            $tax = round($subtotal * 0.17, 2); // 17% VAT
+            $vatRate = $this->getVatRate();
+            $tax = round($subtotal * $vatRate, 2);
             if ($data['shipping_type'] === 'pickup') {
                 $shippingCost = 0.0;
             } elseif (array_key_exists('shipping_cost', $data) && $data['shipping_cost'] !== null) {
@@ -1258,7 +1260,8 @@ class OrderController extends Controller
             }
 
             $subtotal = round($subtotal, 2);
-            $tax = round($subtotal * 0.17, 2);
+            $vatRate = $this->getVatRate();
+            $tax = round($subtotal * $vatRate, 2);
             $shippingCost = array_key_exists('shipping_cost', $validated)
                 ? max(0, (float) $validated['shipping_cost'])
                 : (float) ($order->shipping_cost ?? 0);
@@ -2444,6 +2447,29 @@ class OrderController extends Controller
             'name' => $name,
             'email' => $email,
         ];
+    }
+
+    /**
+     * Resolve VAT rate from system settings (shipping_pricing.vat_rate) with a default of 17%.
+     */
+    protected function getVatRate(): float
+    {
+        $setting = SystemSetting::where('key', 'shipping_pricing')->first();
+        $value = is_array($setting?->value) ? $setting->value : [];
+        $vat = $value['vat_rate'] ?? null;
+
+        if (is_numeric($vat)) {
+            $rate = (float) $vat;
+            if ($rate < 0) {
+                return 0.0;
+            }
+            if ($rate > 1) {
+                return 1.0;
+            }
+            return $rate;
+        }
+
+        return 0.17;
     }
 
     /**
