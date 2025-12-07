@@ -5,4 +5,5 @@ return [
     'token' => env('CASHCOW_TOKEN'),
     'store_id' => env('CASHCOW_STORE_ID'),
     'page_size' => env('CASHCOW_PAGE_SIZE', 20),
+    'notify_email' => env('CASHCOW_NOTIFY_EMAIL'),
 ];

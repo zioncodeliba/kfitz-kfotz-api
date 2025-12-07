@@ -2103,6 +2103,26 @@
                 }
               },
               "description": "Update the file path before sending."
+            },
+            {
+              "name": "Sync Cashcow Inventory",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/admin/products/sync-inventory",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "admin",
+                    "products",
+                    "sync-inventory"
+                  ]
+                }
+              },
+              "response": []
             }
           ]
         },

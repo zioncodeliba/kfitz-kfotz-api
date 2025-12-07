@@ -27,7 +27,10 @@ class CashcowInventorySyncService
     *
     * @return array{pages:int,products_updated:int,variations_updated:int,missing_products:array}
     */
-    public function sync(): array
+    /**
+     * @param callable|null $progress optional progress callback accepting an event array
+     */
+    public function sync(callable $progress = null): array
     {
         $page = 1;
         $pages = 0;
@@ -41,6 +44,11 @@ class CashcowInventorySyncService
 
         while (true) {
             $payload = $this->fetchPage($page);
+            $this->report($progress, [
+                'type' => 'page',
+                'page' => $page,
+                'items' => count($payload['result'] ?? []),
+            ]);
             $pages++;
 
             $items = $payload['result'] ?? [];
@@ -63,10 +71,10 @@ class CashcowInventorySyncService
 
                 $qty = (int) round((float) ($item['qty'] ?? 0));
                 $product->stock_quantity = $qty;
-                $product->save();
                 $productsUpdated++;
 
                 $attributes = $item['attributes'] ?? [];
+                $variationsPayload = [];
                 foreach ($attributes as $attribute) {
                     $displayName = $attribute['attribute_displayname'] ?? null;
                     $options = $attribute['options'] ?? [];
@@ -81,23 +89,39 @@ class CashcowInventorySyncService
                             ? $qty
                             : (int) round((float) $variationQty);
 
-                        ProductVariation::updateOrCreate(
+                        $variation = ProductVariation::updateOrCreate(
                             [
                                 'product_id' => $product->id,
                                 'sku' => $variationSku,
                             ],
                             [
                                 'inventory' => $inventory,
-                                'attributes' => [
-                                    'display_name' => $displayName,
-                                    'option_text' => $option['option_text'] ?? null,
-                                ],
+                                'attributes' => $this->buildVariationAttributes($displayName, $option['option_text'] ?? null),
                             ]
                         );
 
                         $variationsUpdated++;
+                        $variationsPayload[] = $variation;
+                        $this->report($progress, [
+                            'type' => 'variation',
+                            'sku' => $sku,
+                            'variation_sku' => $variationSku,
+                            'inventory' => $inventory,
+                            'option_text' => $option['option_text'] ?? null,
+                            'display_name' => $displayName,
+                        ]);
                     }
                 }
+
+                // Update serialized variations column to reflect current variations
+                $product->variations = $this->buildVariationsArray($product, $variationsPayload);
+                $product->save();
+                $this->report($progress, [
+                    'type' => 'product',
+                    'sku' => $sku,
+                    'qty' => $qty,
+                    'variations_count' => count($product->variations ?? []),
+                ]);
             }
 
             // Stop if fewer than page size (no more pages)
@@ -140,5 +164,65 @@ class CashcowInventorySyncService
         }
 
         return $response->json() ?? [];
+    }
+
+    private function report(?callable $progress, array $event): void
+    {
+        if ($progress) {
+            $progress($event);
+        }
+    }
+
+    /**
+     * Build the attributes payload for a variation (displayName => optionText).
+     */
+    private function buildVariationAttributes(?string $displayName, ?string $optionText): array
+    {
+        $displayName = $displayName !== null ? trim((string) $displayName) : null;
+        $optionText = $optionText !== null ? trim((string) $optionText) : null;
+
+        if ($displayName && $optionText) {
+            return [$displayName => $optionText];
+        }
+
+        return [];
+    }
+
+    /**
+     * Build the serialized variations array for the product model.
+     *
+     * @param Product $product
+     * @param ProductVariation[] $updatedVariations
+     * @return array
+     */
+    private function buildVariationsArray(Product $product, array $updatedVariations): array
+    {
+        // Ensure we have the latest variations; merge newly updated ones to avoid extra queries.
+        $variations = collect($updatedVariations);
+
+        // If nothing in this page, try existing relation to avoid emptying.
+        if ($variations->isEmpty()) {
+            $product->loadMissing('productVariations:id,product_id,sku,price,inventory,attributes,image');
+            $variations = $product->productVariations;
+        }
+
+        if ($variations->isEmpty()) {
+            return [];
+        }
+
+        return $variations
+            ->map(function (ProductVariation $variation) use ($product) {
+                $attributes = $variation->attributes;
+                return [
+                    'id' => $variation->id,
+                    'sku' => $variation->sku,
+                    'image' => $variation->image,
+                    'price' => $variation->price ?? $product->price,
+                    'inventory' => (int) $variation->inventory,
+                    'attributes' => is_array($attributes) ? $attributes : [],
+                ];
+            })
+            ->values()
+            ->all();
     }
 }
