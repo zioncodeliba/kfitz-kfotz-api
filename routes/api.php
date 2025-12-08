@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\EmailListController;
 use App\Http\Controllers\Api\MerchantBannerController;
 use App\Http\Controllers\Api\MerchantPopupController;
 use App\Http\Controllers\Api\SystemSettingController;
+use App\Http\Controllers\Api\ShippingTypeController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -107,6 +108,9 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin'])->group(
     Route::delete('/shipping-carriers/{id}', [ShippingCarrierController::class, 'destroy']);
     Route::post('/shipping-carriers/{id}/test-connection', [ShippingCarrierController::class, 'testConnection']);
     Route::post('/shipping-carriers/{id}/calculate-cost', [ShippingCarrierController::class, 'calculateCost']);
+    Route::post('/shipping-types', [ShippingTypeController::class, 'store']);
+    Route::put('/shipping-types/{shippingType}', [ShippingTypeController::class, 'update']);
+    Route::delete('/shipping-types/{shippingType}', [ShippingTypeController::class, 'destroy']);
     Route::get('/merchant/shipping-settings', [MerchantController::class, 'getShippingSettings']);
     Route::put('/merchant/shipping-settings', [MerchantController::class, 'updateShippingSettings']);
     Route::get('/plugin-sites', [PluginSiteController::class, 'index']);
@@ -146,6 +150,7 @@ Route::middleware(['auth:sanctum', 'verified', 'check.user.role:merchant'])->gro
 
 // Order management (authenticated users)
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/shipping-types', [ShippingTypeController::class, 'index']);
     Route::get('/orders', [OrderController::class, 'index']);
     Route::get('/orders/open', [OrderController::class, 'openOrders']);
     Route::get('/orders/waiting-shipment', [OrderController::class, 'waitingForShipment']);

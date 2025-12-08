@@ -16,6 +16,7 @@ class Product extends Model
         'sale_price',
         'cost_price',
         'shipping_price',
+        'shipping_type_id',
         'stock_quantity',
         'min_stock_alert',
         'category_id',
@@ -36,6 +37,7 @@ class Product extends Model
         'sale_price' => 'decimal:2',
         'cost_price' => 'decimal:2',
         'shipping_price' => 'decimal:2',
+        'shipping_type_id' => 'integer',
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'images' => 'array',
@@ -49,6 +51,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function shippingType(): BelongsTo
+    {
+        return $this->belongsTo(ShippingType::class);
     }
 
     // Check if product is on sale

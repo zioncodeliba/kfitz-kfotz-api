@@ -28,7 +28,7 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category']);
+        $query = Product::with(['category', 'shippingType']);
 
         // Filter by category
         if ($request->has('category_id')) {
@@ -109,6 +109,7 @@ class ProductController extends Controller
             'plugin_site_prices.*.price' => 'required|numeric|min:0',
             'plugin_site_prices.*.site_name' => 'nullable|string|max:255',
             'plugin_site_prices.*.is_enabled' => 'nullable|boolean',
+            'shipping_type_id' => 'nullable|exists:shipping_types,id',
         ]);
 
         if ($request->has('merchant_prices')) {
@@ -137,7 +138,7 @@ class ProductController extends Controller
             $this->syncProductVariations($product, $variationPayload);
         }
 
-        $product->load(['category', 'productVariations']);
+        $product->load(['category', 'productVariations', 'shippingType']);
 
         return $this->createdResponse($product, 'Product created successfully');
     }
@@ -147,7 +148,7 @@ class ProductController extends Controller
      */
     public function show(string $id)
     {
-        $product = Product::with(['category', 'productVariations'])->findOrFail($id);
+        $product = Product::with(['category', 'productVariations', 'shippingType'])->findOrFail($id);
 
         return $this->successResponse($product);
     }
@@ -190,6 +191,7 @@ class ProductController extends Controller
             'plugin_site_prices.*.price' => 'required|numeric|min:0',
             'plugin_site_prices.*.site_name' => 'nullable|string|max:255',
             'plugin_site_prices.*.is_enabled' => 'nullable|boolean',
+            'shipping_type_id' => 'nullable|exists:shipping_types,id',
         ]);
 
         if ($request->has('merchant_prices')) {
@@ -230,7 +232,7 @@ class ProductController extends Controller
             $this->syncProductVariations($product, $variationPayload);
         }
 
-        $product->load(['category', 'productVariations']);
+        $product->load(['category', 'productVariations', 'shippingType']);
 
         if ($wasOutOfStock && $product->stock_quantity > 0) {
             $this->notifyProductBackInStock($product);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ShippingType;
 use App\Models\SystemSetting;
 use App\Traits\ApiResponse;
 use Illuminate\Http\Request;
@@ -23,14 +24,27 @@ class SystemSettingController extends Controller
         $this->authorizeAdmin($request);
 
         $data = $request->validate([
-            'store' => 'required|numeric|min:0',
-            'courier' => 'required|numeric|min:0',
+            'store' => 'nullable|numeric|min:0',
+            'courier' => 'nullable|numeric|min:0',
             'vat_rate' => 'required|numeric|min:0|max:1',
         ]);
 
+        $existing = SystemSetting::where('key', 'shipping_pricing')->first();
+        $existingValue = is_array($existing?->value) ? $existing->value : [];
+
+        $payload = [
+            'store' => array_key_exists('store', $data)
+                ? $this->normalizePrice($data['store'])
+                : $this->normalizePrice($existingValue['store'] ?? null),
+            'courier' => array_key_exists('courier', $data)
+                ? $this->normalizePrice($data['courier'])
+                : $this->normalizePrice($existingValue['courier'] ?? null),
+            'vat_rate' => $this->normalizeVatRate($data['vat_rate'] ?? ($existingValue['vat_rate'] ?? null)),
+        ];
+
         $setting = SystemSetting::updateOrCreate(
             ['key' => 'shipping_pricing'],
-            ['value' => $data]
+            ['value' => $payload]
         );
 
         return $this->successResponse($setting->value, 'Shipping pricing updated successfully');
@@ -45,7 +59,25 @@ class SystemSettingController extends Controller
             'store' => $this->normalizePrice($value['store'] ?? null),
             'courier' => $this->normalizePrice($value['courier'] ?? null),
             'vat_rate' => $this->normalizeVatRate($value['vat_rate'] ?? null),
+            'shipping_types' => $this->resolveShippingTypes(),
         ];
+    }
+
+    protected function resolveShippingTypes(): array
+    {
+        return ShippingType::orderBy('name')
+            ->get()
+            ->map(function (ShippingType $type) {
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                    'price' => (float) $type->price,
+                    'is_default' => (bool) $type->is_default,
+                    'created_at' => $type->created_at,
+                    'updated_at' => $type->updated_at,
+                ];
+            })
+            ->toArray();
     }
 
     protected function normalizePrice($value): float
