@@ -32,28 +32,20 @@ class SyncCashcowInventory extends Command
                         $logLines[] = $line;
                         Log::info('[Cashcow] ' . $line);
                         break;
-                    case 'product':
+                    case 'page_summary':
                         $line = sprintf(
-                            '  Product %s stock -> %d',
-                            $event['sku'] ?? '?',
-                            $event['qty'] ?? 0
+                            'Page %d summary: products %d, variations %d, missing %d',
+                            $event['page'] ?? 0,
+                            $event['products_updated'] ?? 0,
+                            $event['variations_updated'] ?? 0,
+                            $event['missing_count'] ?? 0
                         );
                         $this->line($line);
                         $logLines[] = $line;
-                        Log::info('[Cashcow] ' . $line);
-                        break;
-                    case 'variation':
-                        $line = sprintf(
-                            '    Variation %s (parent %s) stock -> %d%s%s',
-                            $event['variation_sku'] ?? '?',
-                            $event['sku'] ?? '?',
-                            $event['inventory'] ?? 0,
-                            isset($event['display_name']) ? ' | ' . $event['display_name'] : '',
-                            isset($event['option_text']) ? ' = ' . $event['option_text'] : ''
-                        );
-                        $this->line($line);
-                        $logLines[] = $line;
-                        Log::info('[Cashcow] ' . $line);
+                        $logMethod = ($event['missing_count'] ?? 0) > 0 ? 'warning' : 'info';
+                        Log::{$logMethod}('[Cashcow] ' . $line, [
+                            'missing_skus' => $event['missing_skus'] ?? [],
+                        ]);
                         break;
                 }
             });

@@ -43,6 +43,10 @@ class CashcowInventorySyncService
         }
 
         while (true) {
+            $pageProductsUpdated = 0;
+            $pageVariationsUpdated = 0;
+            $pageMissing = [];
+
             $payload = $this->fetchPage($page);
             $this->report($progress, [
                 'type' => 'page',
@@ -66,12 +70,14 @@ class CashcowInventorySyncService
                 $product = Product::where('sku', $sku)->first();
                 if (!$product) {
                     $missing[] = $sku;
+                    $pageMissing[] = $sku;
                     continue;
                 }
 
                 $qty = (int) round((float) ($item['qty'] ?? 0));
                 $product->stock_quantity = $qty;
                 $productsUpdated++;
+                $pageProductsUpdated++;
 
                 $attributes = $item['attributes'] ?? [];
                 $variationsPayload = [];
@@ -101,6 +107,7 @@ class CashcowInventorySyncService
                         );
 
                         $variationsUpdated++;
+                        $pageVariationsUpdated++;
                         $variationsPayload[] = $variation;
                         $this->report($progress, [
                             'type' => 'variation',
@@ -123,6 +130,16 @@ class CashcowInventorySyncService
                     'variations_count' => count($product->variations ?? []),
                 ]);
             }
+
+            $this->report($progress, [
+                'type' => 'page_summary',
+                'page' => $page,
+                'items' => count($items),
+                'products_updated' => $pageProductsUpdated,
+                'variations_updated' => $pageVariationsUpdated,
+                'missing_count' => count($pageMissing),
+                'missing_skus' => array_values(array_unique($pageMissing)),
+            ]);
 
             // Stop if fewer than page size (no more pages)
             if (count($items) < $this->pageSize) {
