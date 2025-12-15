@@ -1,0 +1,267 @@
+{
+  "info": {
+    "_postman_id": "c5b5622f-6c11-45ec-8722-8b17294cfd61",
+    "name": "Chita API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Shipment (WS Simple)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/RunCom.Server/Request.aspx?APPNAME=run&PRGNAME=ship_create_anonymous&ARGUMENTS=-N{{P1}},-A{{P2}},-N{{P3}},-N{{P4}},-A{{P5}},-A{{P6}},-N{{P7}},-N{{P8}},-N{{P9}},-N{{P10}},-A{{P11}},-A{{P12}},-A{{P13}},-A{{P14}},-A{{P15}},-A{{P16}},-A{{P17}},-A{{P18}},-A{{P19}},-A{{P20}},-A{{P21}},-A{{P22}},-A{{P23}},-A{{P24}},-A{{P25}},-A{{P26}},-A{{P27}},-A{{P28}},-N{{P29}},-N{{P30}},-N{{P31}},-A{{P32}},-A{{P33}},-N{{P34}},-N{{P35}},-A{{P36}},-A{{P37}},-A{{P38}},-N{{P39}},-A{{P40}},-A{{P41}},-A{{P42}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "RunCom.Server",
+            "Request.aspx"
+          ],
+          "query": [
+            {
+              "key": "APPNAME",
+              "value": "run"
+            },
+            {
+              "key": "PRGNAME",
+              "value": "ship_create_anonymous"
+            },
+            {
+              "key": "ARGUMENTS",
+              "value": "-N{{P1}},-A{{P2}},-N{{P3}},-N{{P4}},-A{{P5}},-A{{P6}},-N{{P7}},-N{{P8}},-N{{P9}},-N{{P10}},-A{{P11}},-A{{P12}},-A{{P13}},-A{{P14}},-A{{P15}},-A{{P16}},-A{{P17}},-A{{P18}},-A{{P19}},-A{{P20}},-A{{P21}},-A{{P22}},-A{{P23}},-A{{P24}},-A{{P25}},-A{{P26}},-A{{P27}},-A{{P28}},-N{{P29}},-N{{P30}},-N{{P31}},-A{{P32}},-A{{P33}},-N{{P34}},-N{{P35}},-A{{P36}},-A{{P37}},-A{{P38}},-N{{P39}},-A{{P40}},-A{{P41}},-A{{P42}}"
+            }
+          ]
+        },
+        "description": "WS Simple: יצירת משלוח. שולח כל השדות כמחרוזת ARGUMENTS בסדר המתועד. יש להשאיר שדות ריקים עם סימוני -A/-N גם אם אין ערך. מומלץ להשתמש בערכי ברירת מחדל לדוקומנטציה (למשל P36=XML, P37=N/L/S)."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://chita-il.com"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "P1",
+      "value": "",
+      "description": "Customer number (Numeric, 8)"
+    },
+    {
+      "key": "P2",
+      "value": "",
+      "description": "Delivery type מסירה/איסוף (String, 6)"
+    },
+    {
+      "key": "P3",
+      "value": "",
+      "description": "Shipment type code (Numeric, 5)"
+    },
+    {
+      "key": "P4",
+      "value": "",
+      "description": "Shipment stage code (Numeric, 5)"
+    },
+    {
+      "key": "P5",
+      "value": "",
+      "description": "Company name (String, 10)"
+    },
+    {
+      "key": "P6",
+      "value": "",
+      "description": "Leave blank (String, 10)"
+    },
+    {
+      "key": "P7",
+      "value": "",
+      "description": "Shipped cargo type code (Numeric, 5)"
+    },
+    {
+      "key": "P8",
+      "value": "",
+      "description": "Returned cargo type code (Numeric, 5)"
+    },
+    {
+      "key": "P9",
+      "value": "",
+      "description": "Returned packages count (Numeric, 3)"
+    },
+    {
+      "key": "P10",
+      "value": "",
+      "description": "Leave blank (Numeric, 3)"
+    },
+    {
+      "key": "P11",
+      "value": "",
+      "description": "Consignee name (String, 20)"
+    },
+    {
+      "key": "P12",
+      "value": "",
+      "description": "City code (String, 10)"
+    },
+    {
+      "key": "P13",
+      "value": "",
+      "description": "City name (String, 30)"
+    },
+    {
+      "key": "P14",
+      "value": "",
+      "description": "Street code (String, 10)"
+    },
+    {
+      "key": "P15",
+      "value": "",
+      "description": "Street name (String, 30)"
+    },
+    {
+      "key": "P16",
+      "value": "",
+      "description": "Building number (String, 5)"
+    },
+    {
+      "key": "P17",
+      "value": "",
+      "description": "Entrance (String, 1)"
+    },
+    {
+      "key": "P18",
+      "value": "",
+      "description": "Floor (String, 2)"
+    },
+    {
+      "key": "P19",
+      "value": "",
+      "description": "Apartment (String, 4)"
+    },
+    {
+      "key": "P20",
+      "value": "",
+      "description": "Phone primary (String, 20)"
+    },
+    {
+      "key": "P21",
+      "value": "",
+      "description": "Phone secondary (String, 20)"
+    },
+    {
+      "key": "P22",
+      "value": "",
+      "description": "Reference number 1 (String, 200)"
+    },
+    {
+      "key": "P23",
+      "value": "",
+      "description": "Packages count (Numeric, 6)"
+    },
+    {
+      "key": "P24",
+      "value": "",
+      "description": "Address remarks (String, 70)"
+    },
+    {
+      "key": "P25",
+      "value": "",
+      "description": "Shipment remarks (String, 80)"
+    },
+    {
+      "key": "P26",
+      "value": "",
+      "description": "Reference number 2 (String, 50)"
+    },
+    {
+      "key": "P27",
+      "value": "",
+      "description": "Pickup date DD/MM/YYYY (String)"
+    },
+    {
+      "key": "P28",
+      "value": "",
+      "description": "Pickup time HH:MM (String)"
+    },
+    {
+      "key": "P29",
+      "value": "",
+      "description": "Leave blank (Numeric, 12)"
+    },
+    {
+      "key": "P30",
+      "value": "",
+      "description": "Payment type code (Numeric, 3)"
+    },
+    {
+      "key": "P31",
+      "value": "",
+      "description": "Amount to collect (Numeric, 8.2)"
+    },
+    {
+      "key": "P32",
+      "value": "",
+      "description": "Payment collection date DD/MM/YYYY (String)"
+    },
+    {
+      "key": "P33",
+      "value": "",
+      "description": "Payment collection notes (String, 500)"
+    },
+    {
+      "key": "P34",
+      "value": "",
+      "description": "Source pickup point (Numeric)"
+    },
+    {
+      "key": "P35",
+      "value": "",
+      "description": "Destination pickup point (Numeric)"
+    },
+    {
+      "key": "P36",
+      "value": "XML",
+      "description": "Response type TXT/XML (String)"
+    },
+    {
+      "key": "P37",
+      "value": "N",
+      "description": "Auto-assign pickup point N/Y/L/S (String, 1)"
+    },
+    {
+      "key": "P38",
+      "value": "",
+      "description": "Leave blank (String)"
+    },
+    {
+      "key": "P39",
+      "value": "",
+      "description": "Leave blank (Numeric)"
+    },
+    {
+      "key": "P40",
+      "value": "",
+      "description": "Consignee email (String, 100)"
+    },
+    {
+      "key": "P41",
+      "value": "",
+      "description": "Parcel preparation date DD/MM/YYYY (String)"
+    },
+    {
+      "key": "P42",
+      "value": "",
+      "description": "Parcel preparation time HH:MM (String)"
+    }
+  ]
+}
