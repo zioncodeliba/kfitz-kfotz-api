@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\MerchantBannerController;
 use App\Http\Controllers\Api\MerchantPopupController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\ShippingTypeController;
+use App\Http\Controllers\Api\CashcowOrderController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -213,6 +214,10 @@ Route::middleware(['log.plugin.access', 'auth:sanctum', 'verified', 'check.user.
         ->whereNumber('product');
     Route::get('/plugin/products/{product}/inventory', [PluginProductController::class, 'productInventory'])
         ->whereNumber('product');
+});
+
+Route::middleware(['auth:sanctum', 'verified', 'check.user.role:admin,merchant'])->group(function () {
+    Route::post('/cashcow/orders/sync', [CashcowOrderController::class, 'sync']);
 });
 
 // Merchant routes (for merchants)
