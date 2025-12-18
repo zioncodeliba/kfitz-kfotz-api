@@ -1,0 +1,163 @@
+{
+  "info": {
+    "_postman_id": "78f424c5-f306-48ed-befb-181e5b10b054",
+    "name": "YPAY API (Invoices & Receipts)",
+    "description": "Requests for YPAY (ypay.co.il) access token + document generation.\n\nVariables are stored as *collection variables* (not environment variables). Fill in clientId/clientSecret once, run \"Generate Access Token\", then use \"Document Generator\" with Authorization: Bearer {{accessToken}}.\n\nNote: The Document Generator endpoint path is not included in YPAYapi.md; update documentGeneratorPath if needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Generate Access Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": \"{{clientId}}\",\n  \"client_secret\": \"{{clientSecret}}\"\n}"
+            },
+            "url": "{{baseUrl}}{{accessTokenPath}}",
+            "description": "Generates an access token.\n\nSaves response.access_token into the collection variable `accessToken`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "let json;",
+                  "try {",
+                  "  json = pm.response.json();",
+                  "} catch (e) {",
+                  "  json = null;",
+                  "}",
+                  "",
+                  "if (json && json.access_token) {",
+                  "  pm.collectionVariables.set('accessToken', json.access_token);",
+                  "  pm.collectionVariables.set('tokenType', json.token_type || 'bearer');",
+                  "  if (json.lifetime !== undefined && json.lifetime !== null) {",
+                  "    pm.collectionVariables.set('tokenLifetime', String(json.lifetime));",
+                  "    const expiresAt = new Date(Date.now() + Number(json.lifetime) * 1000).toISOString();",
+                  "    pm.collectionVariables.set('accessTokenExpiresAt', expiresAt);",
+                  "  }",
+                  "  console.log('Saved accessToken into collection variables');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Document Generator",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"docType\": 106,\n  \"mail\": true,\n  \"details\": \"Few Details\",\n  \"lang\": \"he\",\n  \"currency\": \"ILS\",\n  \"contact\": {\n    \"email\": \"test@mail.com\",\n    \"businessID\": \"040888888\",\n    \"name\": \"John Black\",\n    \"phone\": \"09-6666660\",\n    \"mobile\": \"0506666660\",\n    \"zipcode\": \"5260170\",\n    \"website\": \"wwww.mywebsite.co.il\",\n    \"address\": \"Hgavish 2, R'annana\",\n    \"comments\": \"Just a comment\"\n  },\n  \"items\": [\n    {\n      \"price\": 1,\n      \"quantity\": 1.0,\n      \"vatIncluded\": true,\n      \"name\": \"test monthly payment\",\n      \"description\": \"test test test test test test test\"\n    }\n  ],\n  \"methods\": [\n    {\n      \"type\": 1,\n      \"total\": 1.0,\n      \"date\": \"{{docDate}}\"\n    }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}{{documentGeneratorPath}}",
+            "description": "Creates a document (invoice/receipt/etc).\n\nHeaders:\n- Content-Type: application/json\n- Authorization: Bearer {{accessToken}}\n\nIf this request returns 404, update `documentGeneratorPath` in collection variables to the correct endpoint path from YPAY docs."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const token = pm.collectionVariables.get('accessToken');",
+                  "if (!token) {",
+                  "  console.warn('No accessToken found. Run \"Auth > Generate Access Token\" first.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://ypay.co.il",
+      "type": "string"
+    },
+    {
+      "key": "accessTokenPath",
+      "value": "/api/v1/accessToken",
+      "type": "string"
+    },
+    {
+      "key": "documentGeneratorPath",
+      "value": "/api/v1/documentGenerator",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clientSecret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tokenType",
+      "value": "bearer",
+      "type": "string"
+    },
+    {
+      "key": "tokenLifetime",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accessTokenExpiresAt",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docDate",
+      "value": "2025-12-18",
+      "type": "string"
+    }
+  ]
+}
