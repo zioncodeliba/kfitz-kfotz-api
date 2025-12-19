@@ -15,6 +15,7 @@ use App\Models\Discount;
 use App\Models\Merchant;
 use App\Services\ShippingSettingsService;
 use App\Services\EmailTemplateService;
+use App\Services\YpayInvoiceService;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -186,7 +187,7 @@ class OrderController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request, YpayInvoiceService $ypayInvoiceService)
     {
         $data = $request->validate([
             'items' => 'required|array|min:1',
@@ -545,6 +546,28 @@ class OrderController extends Controller
             }
 
             $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
+
+            if ($order->merchant_id
+                && strtolower((string) $order->source) !== 'cashcow'
+                && $order->payment_status !== 'paid'
+                && (!is_string($order->invoice_url) || trim((string) $order->invoice_url) === '')
+            ) {
+                try {
+                    $invoice = $ypayInvoiceService->createInvoiceForOrder($order);
+                    $order->forceFill([
+                        'invoice_provider' => 'ypay',
+                        'invoice_url' => $invoice['invoice_url'],
+                        'invoice_payload' => $invoice['payload'],
+                    ])->save();
+                } catch (\Throwable $exception) {
+                    Log::warning('YPAY invoice generation failed during order creation', [
+                        'order_id' => $order->id,
+                        'merchant_id' => $order->merchant_id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+
             $this->notifyOrderEvent($order, 'order.created');
 
             return $this->createdResponse($order, 'Order created successfully');

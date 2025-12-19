@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\MerchantPopupController;
 use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\ShippingTypeController;
 use App\Http\Controllers\Api\CashcowOrderController;
+use App\Http\Controllers\Api\OrderInvoiceController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -169,6 +170,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/orders/{id}/shipping-settings', [OrderController::class, 'getShippingSettings']);
     Route::put('/orders/{id}/shipping-settings', [OrderController::class, 'updateShippingSettings']);
     Route::post('/orders/{id}/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);
+    Route::post('/orders/{order}/invoice', [OrderInvoiceController::class, 'generate'])
+        ->whereNumber('order');
     
     // Merchant management (admin only)
     Route::get('/merchants', [MerchantController::class, 'index']);

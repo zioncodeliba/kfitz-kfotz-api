@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\SystemSetting;
+use App\Services\YpayInvoiceService;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesPluginPricing;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class PluginOrderController extends Controller
     use ApiResponse;
     use HandlesPluginPricing;
 
-    public function store(Request $request)
+    public function store(Request $request, YpayInvoiceService $ypayInvoiceService)
     {
         $user = $request->user();
 
@@ -358,6 +359,26 @@ class PluginOrderController extends Controller
             ]);
 
             $merchantUser->refreshOrderFinancials();
+
+            if (strtolower((string) $order->source) !== 'cashcow'
+                && (!is_string($order->invoice_url) || trim((string) $order->invoice_url) === '')
+            ) {
+                try {
+                    $invoice = $ypayInvoiceService->createInvoiceForOrder($order);
+                    $order->forceFill([
+                        'invoice_provider' => 'ypay',
+                        'invoice_url' => $invoice['invoice_url'],
+                        'invoice_payload' => $invoice['payload'],
+                    ])->save();
+                } catch (\Throwable $exception) {
+                    Log::warning('YPAY invoice generation failed during plugin order creation', [
+                        'order_id' => $order->id,
+                        'merchant_id' => $order->merchant_id,
+                        'site_id' => $site->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
 
             return $this->createdResponse(
                 $order->load(['items', 'merchant', 'user']),

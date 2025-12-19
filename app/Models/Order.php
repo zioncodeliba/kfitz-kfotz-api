@@ -37,6 +37,9 @@ class Order extends Model
         'discount',
         'total',
         'notes',
+        'invoice_provider',
+        'invoice_url',
+        'invoice_payload',
         'shipping_address',
         'billing_address',
         'tracking_number',
@@ -60,6 +63,11 @@ class Order extends Model
         'shipped_at' => 'datetime',
         'delivered_at' => 'datetime',
         'source_metadata' => 'array',
+        'invoice_payload' => 'array',
+    ];
+
+    protected $hidden = [
+        'invoice_payload',
     ];
 
     protected $appends = [

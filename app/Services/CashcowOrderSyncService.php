@@ -209,6 +209,16 @@ class CashcowOrderSyncService
 
         $address = $this->buildAddress($payload);
 
+        $invoiceUrl = isset($payload['InvoiceUrl']) && is_string($payload['InvoiceUrl'])
+            ? trim($payload['InvoiceUrl'])
+            : '';
+
+        if ($invoiceUrl === '' && isset($payload['CopyInvoiceUrl']) && is_string($payload['CopyInvoiceUrl'])) {
+            $invoiceUrl = trim($payload['CopyInvoiceUrl']);
+        }
+
+        $invoiceUrl = $invoiceUrl !== '' ? $invoiceUrl : null;
+
         $metadata = [
             'cashcow_id' => $cashcowId,
             'order_status_id' => $payload['OrderStatus'] ?? null,
@@ -240,6 +250,8 @@ class CashcowOrderSyncService
             'source' => 'cashcow',
             'source_reference' => (string) $cashcowId,
             'source_metadata' => $metadata,
+            'invoice_provider' => $invoiceUrl ? 'cashcow' : null,
+            'invoice_url' => $invoiceUrl,
             'shipping_address' => $address,
             'billing_address' => $address,
             'shipping_type' => $shipping['type'],
