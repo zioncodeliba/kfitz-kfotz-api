@@ -2892,6 +2892,63 @@
           }
         }
       ]
+    },
+    {
+      "name": "Payments / Cardcom Notify",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "responsecode",
+              "value": "0",
+              "type": "text"
+            },
+            {
+              "key": "ReturnData",
+              "value": "{\"merchantId\":1,\"month\":\"2025-12\",\"amount\":100}",
+              "type": "text",
+              "description": "Plain JSON: {\"merchantId\":1,\"month\":\"2025-12\",\"amount\":100}"
+            },
+            {
+              "key": "internaldealnumber",
+              "value": "232990567",
+              "type": "text"
+            },
+            {
+              "key": "ApprovelNumber",
+              "value": "049108",
+              "type": "text"
+            },
+            {
+              "key": "UserEmail",
+              "value": "test@example.com",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{api_base_url}}/api/payments/cardcom/notify",
+          "host": [
+            "{{api_base_url}}"
+          ],
+          "path": [
+            "api",
+            "payments",
+            "cardcom",
+            "notify"
+          ]
+        },
+        "description": "Simulate Cardcom notify callback. Expects ReturnData (base64 JSON with merchantId, month YYYY-MM, amount)."
+      },
+      "response": []
     }
   ],
   "variable": [

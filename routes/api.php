@@ -31,6 +31,7 @@ use App\Http\Controllers\Api\ShippingTypeController;
 use App\Http\Controllers\Api\CashcowOrderController;
 use App\Http\Controllers\Api\OrderInvoiceController;
 use App\Http\Controllers\Api\YpayTestPdfController;
+use App\Http\Controllers\Api\CardcomPaymentController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -51,6 +52,9 @@ Route::get('/products/{id}', [ProductController::class, 'show'])
 Route::get('/products/low-stock', [ProductController::class, 'lowStock']);
 Route::get('/products/back-in-stock', [ProductController::class, 'backInStock']);
 Route::middleware(['auth:sanctum'])->get('/system-settings/shipping', [SystemSettingController::class, 'getShippingPricing']);
+
+// Cardcom notify (public)
+Route::post('/payments/cardcom/notify', [CardcomPaymentController::class, 'notify']);
 
 // Email verification routes
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
