@@ -67,7 +67,6 @@ class YpayInvoiceService
         if (!is_finite($total) || $total <= 0) {
             throw new \RuntimeException('Order total must be a positive number to generate an invoice.');
         }
-
         $payload = [
             'docType' => 106,
             'mail' => false,
@@ -107,6 +106,39 @@ class YpayInvoiceService
                 ],
             ],
         ];
+        // $payload = [
+        //     'docType' => 108,
+        //     'mail' => true,
+        //     'details' => 'test test test test',
+        //     'lang' => 'he',
+        //     'contact' => [
+        //         'email' => 'zioncodeliba@gmail.com',
+        //         'businessID' => '040888888',
+        //         'name' => 'test test',
+        //         'phone' => '02-5866119',
+        //         'mobile' => '0504071205',
+        //         'zipcode' => '5260170',
+        //         'website' => 'wwww.mywebsite.co.il',
+        //         'address' => 'Hgavish 2, Rannana',
+        //         'comments' => 'Just a comment',
+        //     ],
+        //     'items' => [
+        //         [
+        //             'price' => 1,
+        //             'quantity' => 1.0,
+        //             'vatIncluded' => true,
+        //             'name' => 'test monthly payment',
+        //             'description' => 'test test test test test test test',
+        //         ],
+        //     ],
+        //     'methods' => [
+        //         [
+        //             'type' => 1,
+        //             'total' => 1.0,
+        //             'date' => now()->toDateString(),
+        //         ],
+        //     ],
+        // ];
 
         $tokenUrl = $baseUrl . '/' . ltrim($accessTokenPath, '/');
         $tokenResponse = Http::timeout($timeout)
@@ -131,7 +163,9 @@ class YpayInvoiceService
 
         $accessToken = (string) $tokenJson['access_token'];
 
-        $documentUrl = $baseUrl . '/' . ltrim($documentGeneratorPath, '/');
+        // $documentUrl = $baseUrl . '/' . ltrim($documentGeneratorPath, '/');
+        // $documentUrl = 'https://webhook.site/07a96283-acdf-4bd1-aabb-f8995b0bae25';
+        $documentUrl = 'http://localhost:8001/api/ypay/test-pdf';
         $documentResponse = Http::timeout($timeout)
             ->retry(2, 250)
             ->acceptJson()
@@ -332,4 +366,3 @@ class YpayInvoiceService
         return $prioritized[0] ?? $fallback[0] ?? null;
     }
 }
-

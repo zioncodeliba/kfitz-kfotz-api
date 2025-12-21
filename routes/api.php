@@ -30,12 +30,15 @@ use App\Http\Controllers\Api\SystemSettingController;
 use App\Http\Controllers\Api\ShippingTypeController;
 use App\Http\Controllers\Api\CashcowOrderController;
 use App\Http\Controllers\Api\OrderInvoiceController;
+use App\Http\Controllers\Api\YpayTestPdfController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
+Route::post('/ypay/test-pdf', [YpayTestPdfController::class, 'generate']);
 
 // Public product and category routes
 Route::get('/categories', [CategoryController::class, 'index']);
@@ -172,6 +175,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/orders/{id}/calculate-shipping-cost', [OrderController::class, 'calculateShippingCost']);
     Route::post('/orders/{order}/invoice', [OrderInvoiceController::class, 'generate'])
         ->whereNumber('order');
+    
     
     // Merchant management (admin only)
     Route::get('/merchants', [MerchantController::class, 'index']);
