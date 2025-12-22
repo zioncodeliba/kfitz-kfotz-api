@@ -127,6 +127,13 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'chita_webhook' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/chitaWebhook.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];

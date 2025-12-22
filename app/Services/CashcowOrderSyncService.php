@@ -87,6 +87,12 @@ class CashcowOrderSyncService
                     $summary['created']++;
                 } elseif ($result === 'updated') {
                     $summary['updated']++;
+                } elseif ($result === 'skipped_existing') {
+                    $summary['skipped']++;
+                    $summary['skipped_orders'][] = [
+                        'cashcow_id' => $remoteOrder['Id'] ?? null,
+                        'reason' => 'Order already synced',
+                    ];
                 }
             } catch (\Throwable $exception) {
                 $summary['skipped']++;
@@ -279,15 +285,8 @@ class CashcowOrderSyncService
                 $order->save();
                 $action = 'created';
             } else {
-                $order->fill($orderPayload);
-                if (!$order->order_number) {
-                    $order->order_number = $orderNumber;
-                }
-                if (!$order->merchant_site_id) {
-                    $order->merchant_site_id = $site->id;
-                }
-                $order->save();
-                $order->items()->delete();
+                // Existing order: skip to avoid overriding manual changes.
+                return 'skipped_existing';
             }
 
             if ($action === 'created' && $orderDate) {
@@ -321,8 +320,18 @@ class CashcowOrderSyncService
                         $serviceType = 'regular';
                     }
 
-                    $carrierName = $order->carrier?->name ?? 'cashcow';
+                    $carrierName = $order->carrier?->name ?? 'chita';
                     $originAddress = is_array($order->billing_address) ? $order->billing_address : [];
+                    if (empty($originAddress) && is_array($order->shipping_address)) {
+                        $originAddress = $order->shipping_address;
+                    }
+
+                    if (empty($originAddress)) {
+                        $originAddress = [
+                            'name' => $order->merchant?->name ?? null,
+                        ];
+                    }
+
                     $destinationAddress = is_array($order->shipping_address) ? $order->shipping_address : [];
                     $shippingCostValue = is_numeric($order->shipping_cost) ? (float) $order->shipping_cost : 0.0;
 
@@ -333,7 +342,7 @@ class CashcowOrderSyncService
                         'destination_address' => $destinationAddress,
                         'service_type' => $serviceType,
                         'package_type' => 'box',
-                        'carrier_id' => $order->carrier_id,
+                        'carrier_id' => 14,
                         'shipping_cost' => $shippingCostValue,
                     ]);
                 }
@@ -497,25 +506,25 @@ class CashcowOrderSyncService
             4 => [
                 'status' => Order::STATUS_PROCESSING,
                 'payment_status' => 'paid',
-                'label' => 'Paid - waiting for shipment',
+                'label' => 'Paid - processing',
             ],
             6 => [
-                'status' => Order::STATUS_SHIPPED,
+                'status' => Order::STATUS_PROCESSING,
                 'payment_status' => 'paid',
-                'label' => 'Shipped',
+                'label' => 'Paid - processing',
             ],
             1 => [
-                'status' => Order::STATUS_PENDING,
+                'status' => Order::STATUS_PROCESSING,
                 'payment_status' => 'pending',
                 'label' => 'Awaiting bank transfer',
             ],
             2 => [
-                'status' => Order::STATUS_PENDING,
+                'status' => Order::STATUS_PROCESSING,
                 'payment_status' => 'pending',
                 'label' => 'Open without payment',
             ],
             default => [
-                'status' => Order::STATUS_PENDING,
+                'status' => Order::STATUS_PROCESSING,
                 'payment_status' => 'pending',
                 'label' => 'Unknown',
             ],

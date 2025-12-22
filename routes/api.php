@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\CashcowOrderController;
 use App\Http\Controllers\Api\OrderInvoiceController;
 use App\Http\Controllers\Api\YpayTestPdfController;
 use App\Http\Controllers\Api\CardcomPaymentController;
+use App\Http\Controllers\Api\ChitaWebhookController;
 
 // Auth routes (public)
 Route::post('/register', [AuthController::class, 'register']);
@@ -55,6 +56,8 @@ Route::middleware(['auth:sanctum'])->get('/system-settings/shipping', [SystemSet
 
 // Cardcom notify (public)
 Route::post('/payments/cardcom/notify', [CardcomPaymentController::class, 'notify']);
+// Chita webhooks (public) - logs payload
+Route::post('/webhooks/chita', [ChitaWebhookController::class, 'handle']);
 
 // Email verification routes
 Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
