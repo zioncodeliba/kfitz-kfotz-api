@@ -321,12 +321,20 @@ class CashcowOrderSyncService
                         $serviceType = 'regular';
                     }
 
+                    $carrierName = $order->carrier?->name ?? 'cashcow';
+                    $originAddress = is_array($order->billing_address) ? $order->billing_address : [];
+                    $destinationAddress = is_array($order->shipping_address) ? $order->shipping_address : [];
+                    $shippingCostValue = is_numeric($order->shipping_cost) ? (float) $order->shipping_cost : 0.0;
+
                     $order->shipment()->create([
                         'status' => Shipment::STATUS_PENDING,
-                        'destination_address' => $order->shipping_address,
+                        'carrier' => $carrierName,
+                        'origin_address' => $originAddress,
+                        'destination_address' => $destinationAddress,
                         'service_type' => $serviceType,
                         'package_type' => 'box',
                         'carrier_id' => $order->carrier_id,
+                        'shipping_cost' => $shippingCostValue,
                     ]);
                 }
             }
