@@ -12,27 +12,43 @@ class ChitaTrackingService
 {
     public function fetchShipmentData(string $shipNumber): ?array
     {
-        $token = (string) config('chita.token');
+        $token = trim((string) config('chita.token'));
         $baseUrl = rtrim((string) config('chita.base_url'), '/');
         $appName = (string) config('chita.app_name', 'run');
         $program = (string) config('chita.program', 'ship_status_xml');
         $argumentPrefix = (string) config('chita.argument_prefix', '-N');
 
+        $queryParams = [
+            'APPNAME' => $appName,
+            'PRGNAME' => $program,
+            'ARGUMENTS' => $argumentPrefix . $shipNumber,
+        ];
+
+        Log::channel('chita_sync')->info('Chita fetchShipmentData start', [
+            'ship_number' => $shipNumber,
+            'url' => $baseUrl,
+            'params' => $queryParams,
+        ]);
+
         if ($token === '' || $baseUrl === '') {
-            Log::warning('Chita token or base URL missing');
+            Log::channel('chita_sync')->warning('Chita token or base URL missing');
             return null;
         }
 
         $response = Http::timeout(20)
-            ->withToken($token)
-            ->get($baseUrl, [
-                'APPNAME' => $appName,
-                'PRGNAME' => $program,
-                'ARGUMENTS' => $argumentPrefix . $shipNumber,
-            ]);
+            ->withHeaders([
+                'Authorization' => 'bearer ' . $token,
+            ])
+            ->get($baseUrl, $queryParams);
+
+        Log::channel('chita_sync')->info('Chita fetchShipmentData response', [
+            'ship_number' => $shipNumber,
+            'status' => $response->status(),
+            'body' => $response->body(),
+        ]);
 
         if ($response->failed()) {
-            Log::warning('Chita status request failed', [
+            Log::channel('chita_sync')->warning('Chita status request failed', [
                 'ship_number' => $shipNumber,
                 'status' => $response->status(),
                 'body' => $response->body(),
@@ -42,13 +58,13 @@ class ChitaTrackingService
 
         $xml = $response->body();
         if ($xml === '' || str_starts_with(trim($xml), '{')) {
-            Log::warning('Chita status response not XML', ['ship_number' => $shipNumber]);
+            Log::channel('chita_sync')->warning('Chita status response not XML', ['ship_number' => $shipNumber]);
             return null;
         }
 
         $parsed = $this->parseXml($xml);
         if ($parsed === null) {
-            Log::warning('Chita status XML parse failed', ['ship_number' => $shipNumber]);
+            Log::channel('chita_sync')->warning('Chita status XML parse failed', ['ship_number' => $shipNumber]);
         }
 
         return $parsed;

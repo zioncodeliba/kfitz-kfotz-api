@@ -134,6 +134,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'chita_sync' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/chitaSync.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
