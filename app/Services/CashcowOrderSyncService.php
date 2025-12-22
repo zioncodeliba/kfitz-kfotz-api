@@ -7,6 +7,7 @@ use App\Models\MerchantSite;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductVariation;
+use App\Models\Shipment;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -306,6 +307,28 @@ class CashcowOrderSyncService
                     'total_price' => $item['total_price'],
                     'product_data' => $item['product_data'],
                 ]);
+            }
+
+            // If Cashcow marked it as shipped (status 6), ensure we have an active shipment row.
+            if ($order->status === Order::STATUS_SHIPPED) {
+                $hasShipment = $order->shipment()
+                    ->whereIn('status', array_merge(Shipment::ACTIVE_STATUSES, Shipment::FINAL_STATUSES))
+                    ->exists();
+
+                if (!$hasShipment) {
+                    $serviceType = $shipping['method'] ?? 'regular';
+                    if (!in_array($serviceType, ['regular', 'express', 'pickup'], true)) {
+                        $serviceType = 'regular';
+                    }
+
+                    $order->shipment()->create([
+                        'status' => Shipment::STATUS_PENDING,
+                        'destination_address' => $order->shipping_address,
+                        'service_type' => $serviceType,
+                        'package_type' => 'box',
+                        'carrier_id' => $order->carrier_id,
+                    ]);
+                }
             }
 
             return $action;
