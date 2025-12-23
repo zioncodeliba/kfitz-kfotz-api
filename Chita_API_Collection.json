@@ -55,27 +55,27 @@
     },
     {
       "key": "P1",
-      "value": "",
+      "value": "12345678",
       "description": "Customer number (Numeric, 8)"
     },
     {
       "key": "P2",
-      "value": "",
+      "value": "מסירה",
       "description": "Delivery type מסירה/איסוף (String, 6)"
     },
     {
       "key": "P3",
-      "value": "",
+      "value": "10001",
       "description": "Shipment type code (Numeric, 5)"
     },
     {
       "key": "P4",
-      "value": "",
+      "value": "10000",
       "description": "Shipment stage code (Numeric, 5)"
     },
     {
       "key": "P5",
-      "value": "",
+      "value": "KfitzShop",
       "description": "Company name (String, 10)"
     },
     {
@@ -85,7 +85,7 @@
     },
     {
       "key": "P7",
-      "value": "",
+      "value": "20001",
       "description": "Shipped cargo type code (Numeric, 5)"
     },
     {
@@ -105,7 +105,7 @@
     },
     {
       "key": "P11",
-      "value": "",
+      "value": "Test Customer",
       "description": "Consignee name (String, 20)"
     },
     {
@@ -115,7 +115,7 @@
     },
     {
       "key": "P13",
-      "value": "",
+      "value": "Tel Aviv",
       "description": "City name (String, 30)"
     },
     {
@@ -125,72 +125,72 @@
     },
     {
       "key": "P15",
-      "value": "",
+      "value": "Herzl",
       "description": "Street name (String, 30)"
     },
     {
       "key": "P16",
-      "value": "",
+      "value": "10",
       "description": "Building number (String, 5)"
     },
     {
       "key": "P17",
-      "value": "",
+      "value": "A",
       "description": "Entrance (String, 1)"
     },
     {
       "key": "P18",
-      "value": "",
+      "value": "2",
       "description": "Floor (String, 2)"
     },
     {
       "key": "P19",
-      "value": "",
+      "value": "5",
       "description": "Apartment (String, 4)"
     },
     {
       "key": "P20",
-      "value": "",
+      "value": "0501234567",
       "description": "Phone primary (String, 20)"
     },
     {
       "key": "P21",
-      "value": "",
+      "value": "0527654321",
       "description": "Phone secondary (String, 20)"
     },
     {
       "key": "P22",
-      "value": "",
+      "value": "ORDER-1001",
       "description": "Reference number 1 (String, 200)"
     },
     {
       "key": "P23",
-      "value": "",
+      "value": "1",
       "description": "Packages count (Numeric, 6)"
     },
     {
       "key": "P24",
-      "value": "",
+      "value": "Leave at door",
       "description": "Address remarks (String, 70)"
     },
     {
       "key": "P25",
-      "value": "",
+      "value": "Handle with care",
       "description": "Shipment remarks (String, 80)"
     },
     {
       "key": "P26",
-      "value": "",
+      "value": "REF-2",
       "description": "Reference number 2 (String, 50)"
     },
     {
       "key": "P27",
-      "value": "",
+      "value": "01/01/2025",
       "description": "Pickup date DD/MM/YYYY (String)"
     },
     {
       "key": "P28",
-      "value": "",
+      "value": "10:00",
       "description": "Pickup time HH:MM (String)"
     },
     {
@@ -250,7 +250,7 @@
     },
     {
       "key": "P40",
-      "value": "",
+      "value": "test@example.com",
       "description": "Consignee email (String, 100)"
     },
     {

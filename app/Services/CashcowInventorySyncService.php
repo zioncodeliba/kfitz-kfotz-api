@@ -147,7 +147,7 @@ class CashcowInventorySyncService
             }
 
             $page++;
-            sleep(1); // respect remote API
+            usleep(500000); // respect remote API
         }
 
         return [

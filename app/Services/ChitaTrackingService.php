@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Shipment;
+use App\Models\Order;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -91,6 +92,17 @@ class ChitaTrackingService
 
         if ($shipment->status !== $newStatus) {
             $shipment->updateStatus($newStatus);
+
+            if ($newStatus === Shipment::STATUS_DELIVERED) {
+                $order = $shipment->order;
+                if ($order && $order->status !== Order::STATUS_DELIVERED) {
+                    $updates = ['status' => Order::STATUS_DELIVERED];
+                    if (!$order->delivered_at) {
+                        $updates['delivered_at'] = now();
+                    }
+                    $order->update($updates);
+                }
+            }
         }
 
         $shipment->tracking_events = $events;

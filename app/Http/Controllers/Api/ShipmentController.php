@@ -175,7 +175,7 @@ class ShipmentController extends Controller
             return $this->errorResponse('Unauthorized', 403);
         }
 
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'sometimes|in:pending,picked_up,in_transit,out_for_delivery,delivered,failed,returned',
             'carrier' => 'sometimes|string',
             'service_type' => 'sometimes|in:regular,express,pickup',
@@ -190,11 +190,27 @@ class ShipmentController extends Controller
             'cod_payment' => 'boolean',
             'cod_amount' => 'nullable|numeric|min:0',
             'cod_method' => 'nullable|string|max:191',
+            'cod_collected' => 'sometimes|boolean',
+            'cod_collected_at' => 'nullable|date',
             'notes' => 'nullable|string',
         ]);
 
         $oldStatus = $shipment->status;
-        $shipment->update($request->all());
+        $shipment->fill($validated);
+
+        if (array_key_exists('cod_collected', $validated)) {
+            $collected = (bool) $validated['cod_collected'];
+            $shipment->cod_collected = $collected;
+            $shipment->cod_collected_at = $collected
+                ? ($shipment->cod_collected_at ?? now())
+                : null;
+        }
+
+        if (array_key_exists('cod_collected_at', $validated) && !$validated['cod_collected_at']) {
+            $shipment->cod_collected_at = null;
+        }
+
+        $shipment->save();
 
         // Update status with timestamp and tracking event
         if ($request->has('status') && $request->status !== $oldStatus) {
@@ -215,6 +231,51 @@ class ShipmentController extends Controller
         }
 
         return $this->successResponse($shipment->load(['order.user']), 'Shipment updated successfully');
+    }
+
+    /**
+     * Bulk update COD collection status for shipments.
+     */
+    public function updateCodCollectionStatus(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user->hasRole('admin')) {
+            return $this->forbiddenResponse('Unauthorized');
+        }
+
+        $data = $request->validate([
+            'shipment_ids' => 'required|array|min:1',
+            'shipment_ids.*' => 'required|integer|exists:shipments,id',
+            'collected' => 'required|boolean',
+        ]);
+
+        $shipmentIds = collect($data['shipment_ids'])
+            ->filter()
+            ->unique()
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $collected = (bool) $data['collected'];
+        $timestamp = $collected ? now() : null;
+
+        $updated = Shipment::whereIn('id', $shipmentIds)
+            ->where('cod_payment', true)
+            ->update([
+                'cod_collected' => $collected,
+                'cod_collected_at' => $timestamp,
+                'updated_at' => now(),
+            ]);
+
+        $updatedShipments = Shipment::whereIn('id', $shipmentIds)
+            ->get(['id', 'cod_payment', 'cod_amount', 'cod_method', 'cod_collected', 'cod_collected_at']);
+
+        return $this->successResponse([
+            'updated' => $updated,
+            'collected' => $collected,
+            'shipments' => $updatedShipments,
+        ], 'COD collection statuses updated successfully');
     }
 
     /**

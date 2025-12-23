@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Order;
 
 class Shipment extends Model
 {
@@ -47,6 +48,8 @@ class Shipment extends Model
         'cod_payment',
         'cod_amount',
         'cod_method',
+        'cod_collected',
+        'cod_collected_at',
         'shipping_units',
         'notes',
         'tracking_events',
@@ -70,6 +73,8 @@ class Shipment extends Model
         'cod_amount' => 'decimal:2',
         'cod_method' => 'string',
         'cod_payment' => 'boolean',
+        'cod_collected' => 'boolean',
+        'cod_collected_at' => 'datetime',
         'shipping_units' => 'array',
         'picked_up_at' => 'datetime',
         'in_transit_at' => 'datetime',
@@ -168,8 +173,34 @@ class Shipment extends Model
         parent::boot();
         
         static::creating(function ($shipment) {
-            if (empty($shipment->tracking_number)) {
-                $shipment->tracking_number = 'TRK-' . date('Ymd') . '-' . str_pad(static::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
+            if (!empty($shipment->tracking_number)) {
+                return;
+            }
+
+            $orderTracking = null;
+
+            if ($shipment->order_id) {
+                $order = Order::find($shipment->order_id);
+                $orderTracking = $order?->tracking_number;
+            }
+
+            if (!empty($orderTracking)) {
+                $shipment->tracking_number = $orderTracking;
+                return;
+            }
+
+            $shipment->tracking_number = 'TRK-' . date('Ymd') . '-' . str_pad(static::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT);
+        });
+
+        static::created(function ($shipment) {
+            if (!$shipment->order_id || empty($shipment->tracking_number)) {
+                return;
+            }
+
+            $order = Order::find($shipment->order_id);
+            if ($order && empty($order->tracking_number)) {
+                $order->tracking_number = $shipment->tracking_number;
+                $order->save();
             }
         });
     }

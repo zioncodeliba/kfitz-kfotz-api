@@ -167,6 +167,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/orders/open', [OrderController::class, 'openOrders']);
     Route::get('/orders/waiting-shipment', [OrderController::class, 'waitingForShipment']);
     Route::get('/orders/closed', [OrderController::class, 'closedOrders']);
+    Route::get('/orders/cod-collection', [OrderController::class, 'codCollectionOrders']);
     Route::post('/orders', [OrderController::class, 'store']);
     Route::get('/orders/{id}', [OrderController::class, 'show']);
     Route::put('/orders/{id}', [OrderController::class, 'update']);
@@ -250,6 +251,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/shipments/{id}', [ShipmentController::class, 'destroy']);
     Route::get('/shipments/status/{status}', [ShipmentController::class, 'byStatus']);
     Route::post('/shipments/{id}/tracking-events', [ShipmentController::class, 'addTrackingEvent']);
+    Route::post('/shipments/cod-collection/status', [ShipmentController::class, 'updateCodCollectionStatus']);
 });
 
 // Public shipment tracking

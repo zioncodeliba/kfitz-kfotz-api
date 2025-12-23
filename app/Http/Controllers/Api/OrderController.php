@@ -1812,6 +1812,132 @@ class OrderController extends Controller
         return $this->successResponse($shipments, 'Orders waiting for shipment retrieved successfully');
     }
 
+    /**
+     * Get shipments that require COD collection, with collected status breakdown.
+     */
+    public function codCollectionOrders(Request $request)
+    {
+        $user = $request->user();
+        $hasCodCollected = \Illuminate\Support\Facades\Schema::hasColumn('shipments', 'cod_collected');
+
+        $query = Shipment::with([
+                'order.items.product',
+                'order.user',
+                'order.merchant',
+                'order.merchantCustomer',
+                'order.merchantSite',
+                'carrier',
+            ])
+            ->where(function ($inner) {
+                $inner->where('cod_payment', true)
+                    ->orWhereNotNull('cod_amount')
+                    ->orWhereNotNull('cod_method');
+            });
+
+        if ($user->hasRole('admin')) {
+            // Admin can see all COD shipments
+        } elseif ($user->hasRole('merchant')) {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('merchant_id', $user->id);
+            });
+        } elseif ($user->hasRole('agent')) {
+            $managedMerchantIds = $this->getAgentManagedMerchantUserIds($user);
+            $query->whereHas('order', function ($orderQuery) use ($user, $managedMerchantIds) {
+                $orderQuery->where(function ($inner) use ($user, $managedMerchantIds) {
+                    $inner->where('agent_id', $user->id);
+
+                    if (!empty($managedMerchantIds)) {
+                        $inner->orWhereIn('merchant_id', $managedMerchantIds);
+                    }
+                });
+            });
+        } else {
+            $query->whereHas('order', function ($orderQuery) use ($user) {
+                $orderQuery->where('user_id', $user->id);
+            });
+        }
+
+        $collectedFilter = $request->input('collected', null);
+        if ($collectedFilter !== null && $collectedFilter !== '') {
+            $collectedValue = filter_var($collectedFilter, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($collectedValue !== null) {
+                $query->where('cod_collected', $collectedValue);
+            }
+        }
+
+        $merchantSiteFilter = $request->query('merchant_site_id');
+        if ($merchantSiteFilter !== null && $merchantSiteFilter !== '') {
+            if (is_array($merchantSiteFilter)) {
+                $siteIds = array_map(static function ($value) {
+                    return is_numeric($value) ? (int) $value : null;
+                }, $merchantSiteFilter);
+
+                $siteIds = array_filter($siteIds, static function ($value) {
+                    return $value !== null;
+                });
+
+                if (!empty($siteIds)) {
+                    $query->whereHas('order', function ($orderQuery) use ($siteIds) {
+                        $orderQuery->whereIn('merchant_site_id', $siteIds);
+                    });
+                }
+            } elseif (is_string($merchantSiteFilter) && strtolower($merchantSiteFilter) === 'null') {
+                $query->whereHas('order', function ($orderQuery) {
+                    $orderQuery->whereNull('merchant_site_id');
+                });
+            } else {
+                $query->whereHas('order', function ($orderQuery) use ($merchantSiteFilter) {
+                    $orderQuery->where('merchant_site_id', (int) $merchantSiteFilter);
+                });
+            }
+        }
+
+        if ($request->has('source')) {
+            $sourceKey = $request->input('source');
+            if ($sourceKey !== null && $sourceKey !== '') {
+                $query->whereHas('order', function ($orderQuery) use ($sourceKey) {
+                    $orderQuery->where('source', $sourceKey);
+                });
+            }
+        }
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($shipmentQuery) use ($search) {
+                $shipmentQuery->where('tracking_number', 'like', "%{$search}%")
+                    ->orWhereHas('order', function ($orderQuery) use ($search) {
+                        $orderQuery->where('order_number', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $baseQuery = clone $query;
+
+        $summary = [
+            'total_orders' => (clone $baseQuery)->count(),
+            'total_cod_amount' => (float) ((clone $baseQuery)->sum('cod_amount')),
+        ];
+
+        if ($hasCodCollected) {
+            $summary['pending_orders'] = (clone $baseQuery)->where('cod_collected', false)->count();
+            $summary['pending_cod_amount'] = (float) ((clone $baseQuery)->where('cod_collected', false)->sum('cod_amount'));
+            $summary['collected_orders'] = (clone $baseQuery)->where('cod_collected', true)->count();
+            $summary['collected_cod_amount'] = (float) ((clone $baseQuery)->where('cod_collected', true)->sum('cod_amount'));
+        } else {
+            $summary['pending_orders'] = null;
+            $summary['pending_cod_amount'] = null;
+            $summary['collected_orders'] = null;
+            $summary['collected_cod_amount'] = null;
+        }
+
+        $shipments = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 100));
+
+        return $this->successResponse([
+            'shipments' => $shipments,
+            'summary' => $summary,
+        ], 'COD shipments retrieved successfully');
+    }
+
     public function closedOrders(Request $request)
     {
         $user = $request->user();
@@ -1960,6 +2086,7 @@ class OrderController extends Controller
             'shipping_method' => 'nullable|string|max:100',
             'dispatch_shipment' => 'nullable|boolean',
             'carrier_name' => 'nullable|string|max:191',
+            'tracking_number' => 'nullable|string|max:191',
             'origin_address' => 'nullable|array',
             'destination_address' => 'nullable|array',
             'shipping_cost' => 'nullable|numeric|min:0',
@@ -2139,14 +2266,28 @@ class OrderController extends Controller
         );
 
         $shippingCost = $validated['shipping_cost'] ?? $order->shipping_cost ?? $existingShipment?->shipping_cost ?? 0;
-        $codPayment = $request->has('cod_payment')
+        $codPaymentRequested = $request->has('cod_payment')
             ? $request->boolean('cod_payment')
             : ($existingShipment?->cod_payment ?? false);
+        $codAmountValue = $request->has('cod_amount')
+            ? ($validated['cod_amount'] ?? null)
+            : ($existingShipment?->cod_amount ?? null);
+        $codMethodValue = $request->input('cod_method') ?? $existingShipment?->cod_method ?? null;
+
+        $codPayment = $codPaymentRequested
+            || ($codAmountValue !== null && $codAmountValue !== '')
+            || ($codMethodValue !== null && $codMethodValue !== '');
         $codAmount = $codPayment
-            ? ($request->has('cod_amount') ? $validated['cod_amount'] : ($existingShipment?->cod_amount ?? 0))
+            ? ($codAmountValue !== null ? $codAmountValue : ($existingShipment?->cod_amount ?? 0))
             : null;
         $codMethod = $codPayment
-            ? ($request->input('cod_method') ?? $existingShipment?->cod_method ?? null)
+            ? ($codMethodValue ?: ($existingShipment?->cod_method ?? null))
+            : null;
+        $codCollected = $codPayment
+            ? ($existingShipment?->cod_collected ?? false)
+            : null;
+        $codCollectedAt = $codPayment
+            ? ($codCollected ? ($existingShipment?->cod_collected_at ?? now()) : null)
             : null;
 
         $carrierName = $request->input('carrier_name')
@@ -2211,7 +2352,9 @@ class OrderController extends Controller
             $codAmount,
             $request,
             $shippingUnitsPayload,
-            $codMethod
+            $codMethod,
+            $codCollected,
+            $codCollectedAt
         ) {
             $shipment = Shipment::firstOrNew(['order_id' => $order->id]);
 
@@ -2225,6 +2368,7 @@ class OrderController extends Controller
                 'carrier' => $carrierName,
                 'service_type' => $normalizedServiceType,
                 'package_type' => $packageType,
+                'tracking_number' => $request->input('tracking_number') ?? $order->tracking_number ?? ($shipment->exists ? $shipment->tracking_number : null),
                 'origin_address' => $originAddress,
                 'destination_address' => $destinationAddress,
                 'shipping_cost' => $shippingCost,
@@ -2232,6 +2376,8 @@ class OrderController extends Controller
                 'cod_payment' => $codPayment,
                 'cod_amount' => $codPayment ? $codAmount : null,
                 'cod_method' => $codPayment ? $codMethod : null,
+                'cod_collected' => $codPayment ? $codCollected : null,
+                'cod_collected_at' => $codPayment ? $codCollectedAt : null,
                 'shipping_units' => $shippingUnitsPayload,
                 'notes' => $request->input('shipment_notes'),
             ]);

@@ -31,7 +31,8 @@ class EmailTemplateService
 
         $resolvedRecipients = $this->resolveRecipients($template, $recipients, $payload, $includeMailingList);
 
-        if (empty($resolvedRecipients['to'])) {
+        $hasAnyRecipient = !empty($resolvedRecipients['to']) || !empty($resolvedRecipients['cc']) || !empty($resolvedRecipients['bcc']);
+        if (!$hasAnyRecipient) {
             return $this->createLog($template, $eventKey, $payload, 'skipped', 'No recipients defined for template.');
         }
 
@@ -120,18 +121,17 @@ class EmailTemplateService
 
     protected function resolveRecipients(EmailTemplate $template, array $override, array $payload, bool $includeMailingList): array
     {
-        $defaults = $template->default_recipients ?? [];
         $resolved = [
-            'to' => $this->normalizeRecipients($override['to'] ?? $defaults['to'] ?? []),
-            'cc' => $this->normalizeRecipients($override['cc'] ?? $defaults['cc'] ?? []),
-            'bcc' => $this->normalizeRecipients($override['bcc'] ?? $defaults['bcc'] ?? []),
+            'to' => $this->normalizeRecipients($override['to'] ?? []),
+            'cc' => $this->normalizeRecipients($override['cc'] ?? []),
+            'bcc' => $this->normalizeRecipients($override['bcc'] ?? []),
         ];
 
         foreach ($resolved as $type => $list) {
-            $resolved[$type] = array_map(function (array $recipient) use ($payload) {
+            $resolved[$type] = array_map(function (array $recipient) {
                 return [
-                    'email' => isset($recipient['email']) ? $this->renderString($recipient['email'], $payload) : null,
-                    'name' => isset($recipient['name']) ? $this->renderString($recipient['name'], $payload) : null,
+                    'email' => isset($recipient['email']) ? trim((string) $recipient['email']) : null,
+                    'name' => isset($recipient['name']) ? trim((string) $recipient['name']) : null,
                 ];
             }, $list);
 
