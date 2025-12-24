@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\MerchantPayment;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,17 +15,6 @@ class YpayInvoiceService
      */
     public function createInvoiceForOrder(Order $order): array
     {
-        $baseUrl = rtrim((string) config('ypay.base_url'), '/');
-        $accessTokenPath = (string) config('ypay.access_token_path');
-        $documentGeneratorPath = (string) config('ypay.document_generator_path');
-        $clientId = (string) config('ypay.client_id');
-        $clientSecret = (string) config('ypay.client_secret');
-        $timeout = (int) config('ypay.timeout', 30);
-
-        if ($baseUrl === '' || $clientId === '' || $clientSecret === '') {
-            throw new \RuntimeException('YPAY is not configured. Please set YPAY_CLIENT_ID and YPAY_CLIENT_SECRET.');
-        }
-
         $order->loadMissing(['merchant.merchant', 'items']);
 
         $merchantUser = $order->merchant;
@@ -32,64 +22,25 @@ class YpayInvoiceService
             throw new \RuntimeException('Order is missing merchant data.');
         }
 
-        $merchantProfile = $merchantUser->merchant;
-        if (!$merchantProfile) {
-            throw new \RuntimeException('Merchant profile is missing.');
-        }
-
-        $businessId = is_string($merchantProfile->business_id ?? null) ? trim((string) $merchantProfile->business_id) : '';
-        if ($businessId === '') {
-            throw new \RuntimeException('Merchant business ID is missing. Please update the merchant profile.');
-        }
-
-        $email = is_string($merchantProfile->email_for_orders ?? null) ? trim((string) $merchantProfile->email_for_orders) : '';
-        if ($email === '') {
-            $email = is_string($merchantUser->email ?? null) ? trim((string) $merchantUser->email) : '';
-        }
-
-        $contactName = is_string($merchantProfile->business_name ?? null) ? trim((string) $merchantProfile->business_name) : '';
-        if ($contactName === '') {
-            $contactName = is_string($merchantUser->name ?? null) ? trim((string) $merchantUser->name) : '';
-        }
-
-        $phone = is_string($merchantProfile->phone ?? null) ? trim((string) $merchantProfile->phone) : '';
-        if ($phone === '') {
-            $phone = is_string($merchantUser->phone ?? null) ? trim((string) $merchantUser->phone) : '';
-        }
-
-        $addressData = $merchantProfile->address;
-        $address = $this->formatAddress($addressData);
-        $zipcode = $this->extractZipcode($addressData);
-
-        $website = is_string($merchantProfile->website ?? null) ? trim((string) $merchantProfile->website) : '';
-
         $total = (float) $order->total;
         if (!is_finite($total) || $total <= 0) {
             throw new \RuntimeException('Order total must be a positive number to generate an invoice.');
         }
+
+        $details = sprintf('Order %s', $order->order_number);
         $payload = [
             'docType' => 106,
             'mail' => false,
-            'details' => sprintf('Order %s', $order->order_number),
+            'details' => $details,
             'lang' => 'he',
             'currency' => 'ILS',
-            'contact' => array_filter([
-                'email' => $email !== '' ? $email : null,
-                'businessID' => $businessId,
-                'name' => $contactName !== '' ? $contactName : null,
-                'phone' => $phone !== '' ? $phone : null,
-                'mobile' => $phone !== '' ? $phone : null,
-                'zipcode' => $zipcode !== '' ? $zipcode : null,
-                'website' => $website !== '' ? $website : null,
-                'address' => $address !== '' ? $address : null,
-                'comments' => sprintf('Order %s', $order->order_number),
-            ], static fn ($value) => $value !== null),
+            'contact' => $this->buildMerchantContact($merchantUser, $details),
             'items' => [
                 [
                     'price' => $total,
                     'quantity' => 1.0,
                     'vatIncluded' => true,
-                    'name' => sprintf('Order %s', $order->order_number),
+                    'name' => $details,
                     'description' => sprintf(
                         'Products: %.2f | VAT: %.2f | Shipping: %.2f',
                         (float) $order->subtotal,
@@ -139,6 +90,128 @@ class YpayInvoiceService
         //         ],
         //     ],
         // ];
+
+        return $this->sendDocument($payload);
+    }
+
+    /**
+     * @return array{invoice_url:string, payload:array}
+     */
+    public function createReceiptForMerchantPayment(MerchantPayment $payment): array
+    {
+        $payment->loadMissing(['merchant.merchant']);
+
+        $merchantUser = $payment->merchant;
+        if (!$merchantUser instanceof User) {
+            throw new \RuntimeException('Payment is missing merchant data.');
+        }
+
+        $amount = (float) $payment->amount;
+        if (!is_finite($amount) || $amount <= 0) {
+            throw new \RuntimeException('Payment amount must be a positive number to generate a receipt.');
+        }
+
+        $paymentMonth = is_string($payment->payment_month) && trim($payment->payment_month) !== ''
+            ? trim($payment->payment_month)
+            : now()->format('Y-m');
+        $details = sprintf('Monthly payment %s', $paymentMonth);
+        $currency = is_string($payment->currency) && trim($payment->currency) !== ''
+            ? strtoupper(trim($payment->currency))
+            : 'ILS';
+
+        $payload = [
+            'docType' => 108,
+            'mail' => false,
+            'details' => $details,
+            'lang' => 'he',
+            'currency' => $currency,
+            'contact' => $this->buildMerchantContact($merchantUser, $details),
+            'items' => [
+                [
+                    'price' => $amount,
+                    'quantity' => 1.0,
+                    'vatIncluded' => true,
+                    'name' => $details,
+                    'description' => $details,
+                ],
+            ],
+            'methods' => [
+                [
+                    'type' => 1,
+                    'total' => $amount,
+                    'date' => ($payment->paid_at?->toDateString()) ?? now()->toDateString(),
+                ],
+            ],
+        ];
+
+        return $this->sendDocument($payload);
+    }
+
+    private function buildMerchantContact(User $merchantUser, ?string $comments = null): array
+    {
+        $merchantUser->loadMissing('merchant');
+
+        $merchantProfile = $merchantUser->merchant;
+        if (!$merchantProfile) {
+            throw new \RuntimeException('Merchant profile is missing.');
+        }
+
+        $businessId = is_string($merchantProfile->business_id ?? null) ? trim((string) $merchantProfile->business_id) : '';
+        if ($businessId === '') {
+            throw new \RuntimeException('Merchant business ID is missing. Please update the merchant profile.');
+        }
+
+        $email = is_string($merchantProfile->email_for_orders ?? null) ? trim((string) $merchantProfile->email_for_orders) : '';
+        if ($email === '') {
+            $email = is_string($merchantUser->email ?? null) ? trim((string) $merchantUser->email) : '';
+        }
+
+        $contactName = is_string($merchantProfile->business_name ?? null) ? trim((string) $merchantProfile->business_name) : '';
+        if ($contactName === '') {
+            $contactName = is_string($merchantUser->name ?? null) ? trim((string) $merchantUser->name) : '';
+        }
+
+        $phone = is_string($merchantProfile->phone ?? null) ? trim((string) $merchantProfile->phone) : '';
+        if ($phone === '') {
+            $phone = is_string($merchantUser->phone ?? null) ? trim((string) $merchantUser->phone) : '';
+        }
+
+        $addressData = $merchantProfile->address;
+        $address = $this->formatAddress($addressData);
+        $zipcode = $this->extractZipcode($addressData);
+
+        $website = is_string($merchantProfile->website ?? null) ? trim((string) $merchantProfile->website) : '';
+        $commentValue = is_string($comments) && trim($comments) !== '' ? trim($comments) : null;
+
+        return array_filter([
+            'email' => $email !== '' ? $email : null,
+            'businessID' => $businessId,
+            'name' => $contactName !== '' ? $contactName : null,
+            'phone' => $phone !== '' ? $phone : null,
+            'mobile' => $phone !== '' ? $phone : null,
+            'zipcode' => $zipcode !== '' ? $zipcode : null,
+            'website' => $website !== '' ? $website : null,
+            'address' => $address !== '' ? $address : null,
+            'comments' => $commentValue,
+        ], static fn ($value) => $value !== null);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{invoice_url:string, payload:array}
+     */
+    private function sendDocument(array $payload): array
+    {
+        $baseUrl = rtrim((string) config('ypay.base_url'), '/');
+        $accessTokenPath = (string) config('ypay.access_token_path');
+        $documentGeneratorPath = (string) config('ypay.document_generator_path');
+        $clientId = (string) config('ypay.client_id');
+        $clientSecret = (string) config('ypay.client_secret');
+        $timeout = (int) config('ypay.timeout', 30);
+
+        if ($baseUrl === '' || $clientId === '' || $clientSecret === '') {
+            throw new \RuntimeException('YPAY is not configured. Please set YPAY_CLIENT_ID and YPAY_CLIENT_SECRET.');
+        }
 
         $tokenUrl = $baseUrl . '/' . ltrim($accessTokenPath, '/');
         $tokenResponse = Http::timeout($timeout)

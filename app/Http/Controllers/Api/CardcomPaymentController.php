@@ -5,20 +5,25 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\MerchantPayment;
+use App\Services\YpayInvoiceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CardcomPaymentController extends Controller
 {
-    public function notify(Request $request)
+    public function notify(Request $request, YpayInvoiceService $ypayInvoiceService)
     {
+        $logger = Log::channel('cardcom_notify');
         $payload = $request->all();
+
+        $logger->info('Cardcom notify received', ['payload' => $payload]);
 
         $responseCode = (int) ($payload['responsecode'] ?? $payload['ResponseCode'] ?? 0);
         if ($responseCode !== 0) {
-            Log::warning('Cardcom notify non-success response', ['payload' => $payload]);
+            $logger->warning('Cardcom notify non-success response', ['payload' => $payload]);
             return response()->json(['message' => 'Payment not successful', 'code' => $responseCode], 400);
         }
 
@@ -37,7 +42,7 @@ class CardcomPaymentController extends Controller
         }
 
         if (!$merchantId || !$monthKey) {
-            Log::warning('Cardcom notify missing merchant/month', [
+            $logger->warning('Cardcom notify missing merchant/month', [
                 'returnData' => $returnDataRaw,
                 'parsed' => $parsed,
                 'payload_keys' => array_keys($payload),
@@ -65,7 +70,7 @@ class CardcomPaymentController extends Controller
         if ($expectedAmount !== null && $expectedAmount > 0) {
             $diff = abs($expectedAmount - $outstanding);
             if ($diff > 1.0) {
-                Log::warning('Cardcom notify amount mismatch', [
+                $logger->warning('Cardcom notify amount mismatch', [
                     'merchant_id' => $merchantId,
                     'month' => $monthKey,
                     'expected' => $expectedAmount,
@@ -75,8 +80,10 @@ class CardcomPaymentController extends Controller
         }
 
         $updatedCount = 0;
+        $payment = null;
+        $paymentMethod = $payload['MutagName'] ?? 'cardcom';
 
-        DB::transaction(function () use ($query, $payload, $merchantId, $monthKey, $expectedAmount, &$updatedCount) {
+        DB::transaction(function () use ($query, $payload, $merchantId, $monthKey, $expectedAmount, $paymentMethod, &$updatedCount, &$payment) {
             $amount = $expectedAmount;
             if ($amount === null || $amount <= 0) {
                 $amount = isset($payload['suminfull']) ? (float) $payload['suminfull'] : null;
@@ -89,11 +96,10 @@ class CardcomPaymentController extends Controller
             }
 
             $reference = $payload['internaldealnumber'] ?? $payload['InternalDealNumber'] ?? null;
-            $paymentMethod = $payload['MutagName'] ?? 'cardcom';
             $paymentMonth = $monthKey ?? now()->format('Y-m');
 
             if ($amount !== null && $amount > 0) {
-                MerchantPayment::firstOrCreate(
+                $payment = MerchantPayment::firstOrCreate(
                     [
                         'merchant_id' => $merchantId,
                         'reference' => $reference,
@@ -114,6 +120,30 @@ class CardcomPaymentController extends Controller
 
             $updatedCount = (int) $query->update(['payment_status' => 'paid']);
         });
+
+        if (
+            $payment instanceof MerchantPayment
+            && (!is_string($payment->receipt_url) || trim($payment->receipt_url) === '')
+        ) {
+            try {
+                $receipt = $ypayInvoiceService->createReceiptForMerchantPayment($payment);
+                $payment->forceFill([
+                    'receipt_url' => $receipt['invoice_url'],
+                ])->save();
+
+                $logger->info('Cardcom receipt generated', [
+                    'merchant_id' => $merchantId,
+                    'payment_id' => $payment->id,
+                    'receipt_url' => $payment->receipt_url,
+                ]);
+            } catch (Throwable $e) {
+                $logger->warning('Cardcom receipt generation failed', [
+                    'merchant_id' => $merchantId,
+                    'payment_id' => $payment->id ?? null,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json([
             'message' => 'Orders marked as paid',
@@ -146,7 +176,7 @@ class CardcomPaymentController extends Controller
         }
 
         // Fallback: not parseable
-        Log::warning('Cardcom ReturnData not parseable', ['ReturnData' => $raw]);
+        Log::channel('cardcom_notify')->warning('Cardcom ReturnData not parseable', ['ReturnData' => $raw]);
         return [];
     }
 }

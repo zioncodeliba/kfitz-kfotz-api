@@ -141,6 +141,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'cardcom_notify' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/cardcomNotify.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
