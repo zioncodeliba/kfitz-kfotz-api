@@ -2285,7 +2285,7 @@ class OrderController extends Controller
             : null;
         $codCollected = $codPayment
             ? ($existingShipment?->cod_collected ?? false)
-            : null;
+            : false;
         $codCollectedAt = $codPayment
             ? ($codCollected ? ($existingShipment?->cod_collected_at ?? now()) : null)
             : null;
@@ -2376,8 +2376,8 @@ class OrderController extends Controller
                 'cod_payment' => $codPayment,
                 'cod_amount' => $codPayment ? $codAmount : null,
                 'cod_method' => $codPayment ? $codMethod : null,
-                'cod_collected' => $codPayment ? $codCollected : null,
-                'cod_collected_at' => $codPayment ? $codCollectedAt : null,
+                'cod_collected' => $codCollected,
+                'cod_collected_at' => $codCollectedAt,
                 'shipping_units' => $shippingUnitsPayload,
                 'notes' => $request->input('shipment_notes'),
             ]);
