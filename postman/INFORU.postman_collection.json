@@ -1,0 +1,358 @@
+{
+  "info": {
+    "_postman_id": "7f6d7c4e-0e1e-4b7b-9d5a-1e3b8c1e4b7a",
+    "name": "Inforu API (Email & SMS)",
+    "description": "Postman collection for Inforu (Email/Umail + SMS) based on inforuApi.md.\n\nSet collection variable `basicAuth` to the base64 token (without the 'Basic ' prefix).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Email (Umail)",
+      "item": [
+        {
+          "name": "Send Existing Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"CampaignId\": \"{{campaignIdExisting}}\",\n    \"Duplicate\": 0,\n    \"IncludeContacts\": [\n      {\n        \"FirstName\": \"string\",\n        \"Email\": \"{{emailRecipient2}}\"\n      }\n    ]\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/Umail/Campaign/Send/",
+            "description": "Send an existing campaign to specific contacts."
+          }
+        },
+        {
+          "name": "Send New Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"CampaignName\": \"My First Email\",\n    \"CampaignRefId\": \"{{campaignRefId}}\",\n    \"FromAddress\": \"{{fromAddress}}\",\n    \"ReplyAddress\": \"{{replyAddress}}\",\n    \"FromName\": \"{{fromName}}\",\n    \"Subject\": \"{{subject}}\",\n    \"PreHeader\": \"{{preHeader}}\",\n    \"Body\": \"test...\",\n    \"IncludeContacts\": [\n      {\n        \"Email\": \"{{emailRecipient}}\"\n      }\n    ]\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Message/Send",
+            "description": "Send a new email campaign."
+          }
+        },
+        {
+          "name": "Get Campaign List",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"CampaignIds\": [\n      \"{{campaignId}}\"\n    ],\n    \"StartDate\": \"{{startDate}}\",\n    \"EndDate\": \"{{endDate}}\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Campaign/List/",
+            "description": "List campaigns by ID and date range."
+          }
+        },
+        {
+          "name": "Get Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"CampaignId\": \"{{campaignId}}\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Campaign/Get/",
+            "description": "Get details for a single campaign."
+          }
+        },
+        {
+          "name": "Update Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"DuplicateFromCampaignId\": \"{{campaignId}}\",\n    \"StringReplace\": [\n      {\n        \"Field\": \"Subject\",\n        \"Search\": \"param1\",\n        \"Replace\": \"param2\"\n      }\n    ]\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Campaign/Update",
+            "description": "Update a campaign with string replacements."
+          }
+        }
+      ]
+    },
+    {
+      "name": "SMS",
+      "item": [
+        {
+          "name": "Send SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"Message\": \"Hello world\",\n    \"Recipients\": [\n      {\n        \"Phone\": \"{{phoneNumber}}\"\n      }\n    ],\n    \"Settings\": {\n      \"Sender\": \"{{smsSender}}\"\n    }\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/SMS/SendSms",
+            "description": "Send SMS message."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "item": [
+        {
+          "name": "Get Job Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"JobToken\": \"{{jobToken}}\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Campaign/Job",
+            "description": "Check background job status."
+          }
+        },
+        {
+          "name": "Get Mail Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"BatchSize\": \"200\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/GetMailNotification",
+            "description": "Pull mail notifications in batches."
+          }
+        },
+        {
+          "name": "Stop Future Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Basic {{basicAuth}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Data\": {\n    \"CampaignId\": \"{{campaignId}}\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/api/v2/Umail/Campaign/Stop",
+            "description": "Stop a scheduled campaign."
+          }
+        },
+        {
+          "name": "Webhook - Unsubscribe (Sample)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/xml"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "<InfoMailClient>\n<ContactsRemoved>\n    <contact email=\"{{unsubscribeEmail}}\" UserId=\"{{unsubscribeUserId}}\" Username=\"{{unsubscribeUsername}}\" CustomerId=\"{{unsubscribeCustomerId}}\" ProjectId=\"{{unsubscribeProjectId}}\"/>\n</ContactsRemoved>\n</InfoMailClient>"
+            },
+            "url": "{{unsubscribeWebhookUrl}}",
+            "description": "Sample payload for unsubscribe notifications sent to your webhook."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://capi.inforu.co.il",
+      "type": "string"
+    },
+    {
+      "key": "basicAuth",
+      "value": "REPLACE_ME_BASE64",
+      "type": "string"
+    },
+    {
+      "key": "campaignIdExisting",
+      "value": "57934763",
+      "type": "string"
+    },
+    {
+      "key": "campaignId",
+      "value": "30000810",
+      "type": "string"
+    },
+    {
+      "key": "campaignRefId",
+      "value": "213456789",
+      "type": "string"
+    },
+    {
+      "key": "fromAddress",
+      "value": "ariel.l@inforu.co.il",
+      "type": "string"
+    },
+    {
+      "key": "replyAddress",
+      "value": "ariel@abc.co.il",
+      "type": "string"
+    },
+    {
+      "key": "fromName",
+      "value": "Abc Company",
+      "type": "string"
+    },
+    {
+      "key": "subject",
+      "value": "Summer Sale",
+      "type": "string"
+    },
+    {
+      "key": "preHeader",
+      "value": "AAAA DDDDD",
+      "type": "string"
+    },
+    {
+      "key": "emailRecipient",
+      "value": "ohad@inforu.co.il",
+      "type": "string"
+    },
+    {
+      "key": "emailRecipient2",
+      "value": "example1@example.com",
+      "type": "string"
+    },
+    {
+      "key": "phoneNumber",
+      "value": "0504071205",
+      "type": "string"
+    },
+    {
+      "key": "smsSender",
+      "value": "MyBrand",
+      "type": "string"
+    },
+    {
+      "key": "jobToken",
+      "value": "715fzq90yzsi",
+      "type": "string"
+    },
+    {
+      "key": "startDate",
+      "value": "2022-05-31",
+      "type": "string"
+    },
+    {
+      "key": "endDate",
+      "value": "2023-05-31",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeWebhookUrl",
+      "value": "http://www.clienturl.co.il/demo.aspx",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeEmail",
+      "value": "email@inforu.co.il",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeUserId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeUsername",
+      "value": "test",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeCustomerId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "unsubscribeProjectId",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+}
