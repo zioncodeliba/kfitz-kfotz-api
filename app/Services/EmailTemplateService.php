@@ -11,7 +11,13 @@ use Throwable;
 
 class EmailTemplateService
 {
-    public function send(string $eventKey, array $payload, array $recipients = [], bool $includeMailingList = true): EmailLog
+    public function send(
+        string $eventKey,
+        array $payload,
+        array $recipients = [],
+        bool $includeMailingList = true,
+        bool $ignoreOverrideRecipients = false
+    ): EmailLog
     {
         $templateQuery = EmailTemplate::query()
             ->where('event_key', $eventKey)
@@ -20,6 +26,14 @@ class EmailTemplateService
         $template = $templateQuery->first();
 
         if (!$template) {
+            Log::warning('Email skipped: template not configured', [
+                'event_key' => $eventKey,
+                'include_mailing_list' => $includeMailingList,
+                'ignore_override_recipients' => $ignoreOverrideRecipients,
+                'payload_recipient' => Arr::get($payload, 'recipient.email'),
+                'override_recipients' => $this->recipientCounts($recipients, $payload),
+            ]);
+
             return $this->createLog(null, $eventKey, $payload, 'skipped', 'Email template is not configured.');
         }
 
@@ -29,10 +43,31 @@ class EmailTemplateService
             }]);
         }
 
-        $resolvedRecipients = $this->resolveRecipients($template, $recipients, $payload, $includeMailingList);
+        $resolvedRecipients = $this->resolveRecipients(
+            $template,
+            $recipients,
+            $payload,
+            $includeMailingList,
+            $ignoreOverrideRecipients
+        );
 
         $hasAnyRecipient = !empty($resolvedRecipients['to']) || !empty($resolvedRecipients['cc']) || !empty($resolvedRecipients['bcc']);
         if (!$hasAnyRecipient) {
+            Log::warning('Email skipped: no recipients resolved', [
+                'event_key' => $eventKey,
+                'template_id' => $template->id,
+                'email_list_id' => $template->email_list_id,
+                'include_mailing_list' => $includeMailingList,
+                'ignore_override_recipients' => $ignoreOverrideRecipients,
+                'payload_recipient' => Arr::get($payload, 'recipient.email'),
+                'override_recipients' => $this->recipientCounts($recipients, $payload),
+                'resolved_recipients' => [
+                    'to' => count($resolvedRecipients['to']),
+                    'cc' => count($resolvedRecipients['cc']),
+                    'bcc' => count($resolvedRecipients['bcc']),
+                ],
+            ]);
+
             return $this->createLog($template, $eventKey, $payload, 'skipped', 'No recipients defined for template.');
         }
 
@@ -119,24 +154,20 @@ class EmailTemplateService
         ]);
     }
 
-    protected function resolveRecipients(EmailTemplate $template, array $override, array $payload, bool $includeMailingList): array
+    protected function resolveRecipients(
+        EmailTemplate $template,
+        array $override,
+        array $payload,
+        bool $includeMailingList,
+        bool $ignoreOverrideRecipients
+    ): array
     {
-        $resolved = [
-            'to' => $this->normalizeRecipients($override['to'] ?? []),
-            'cc' => $this->normalizeRecipients($override['cc'] ?? []),
-            'bcc' => $this->normalizeRecipients($override['bcc'] ?? []),
-        ];
+        $templateRecipients = $this->normalizeRecipientGroups($template->default_recipients, $payload);
+        $overrideRecipients = $this->normalizeRecipientGroups($override, $payload);
 
-        foreach ($resolved as $type => $list) {
-            $resolved[$type] = array_map(function (array $recipient) {
-                return [
-                    'email' => isset($recipient['email']) ? trim((string) $recipient['email']) : null,
-                    'name' => isset($recipient['name']) ? trim((string) $recipient['name']) : null,
-                ];
-            }, $list);
-
-            $resolved[$type] = array_values(array_filter($resolved[$type], fn ($recipient) => !empty($recipient['email'])));
-        }
+        $resolved = ($ignoreOverrideRecipients || !$this->hasAnyRecipient($overrideRecipients))
+            ? $templateRecipients
+            : $overrideRecipients;
 
         if ($includeMailingList && $template->emailList && $template->emailList->relationLoaded('contacts')) {
             $listRecipients = $this->buildRecipientsFromList($template->emailList->contacts);
@@ -148,28 +179,54 @@ class EmailTemplateService
         return $resolved;
     }
 
-    protected function normalizeRecipients($value): array
+    protected function normalizeRecipientGroups($value, array $payload): array
+    {
+        $source = is_array($value) ? $value : [];
+
+        return [
+            'to' => $this->normalizeRecipients($source['to'] ?? [], $payload),
+            'cc' => $this->normalizeRecipients($source['cc'] ?? [], $payload),
+            'bcc' => $this->normalizeRecipients($source['bcc'] ?? [], $payload),
+        ];
+    }
+
+    protected function normalizeRecipients($value, array $payload = []): array
     {
         if (is_null($value)) {
             return [];
         }
 
         if (is_string($value)) {
-            return [['email' => $value]];
+            $email = $this->renderRecipientValue($value, $payload);
+
+            return $email ? [['email' => $email]] : [];
         }
 
         $normalized = [];
 
         foreach ((array) $value as $item) {
             if (is_string($item)) {
-                $normalized[] = ['email' => $item];
+                $email = $this->renderRecipientValue($item, $payload);
+                if ($email) {
+                    $normalized[] = ['email' => $email];
+                }
                 continue;
             }
 
             if (is_array($item) && isset($item['email'])) {
+                $email = $this->renderRecipientValue((string) $item['email'], $payload);
+                if (!$email) {
+                    continue;
+                }
+
+                $name = null;
+                if (isset($item['name']) && is_string($item['name'])) {
+                    $name = $this->renderRecipientValue($item['name'], $payload);
+                }
+
                 $normalized[] = [
-                    'email' => $item['email'],
-                    'name' => $item['name'] ?? null,
+                    'email' => $email,
+                    'name' => $name,
                 ];
             }
         }
@@ -221,6 +278,39 @@ class EmailTemplateService
         }
 
         return $base;
+    }
+
+    protected function hasAnyRecipient(array $recipients): bool
+    {
+        return !empty($recipients['to']) || !empty($recipients['cc']) || !empty($recipients['bcc']);
+    }
+
+    protected function recipientCounts(array $recipients, array $payload = []): array
+    {
+        $count = function ($value) use ($payload): int {
+            $normalized = $this->normalizeRecipients($value, $payload);
+            $filtered = array_filter($normalized, fn ($recipient) => !empty($recipient['email']));
+
+            return count($filtered);
+        };
+
+        return [
+            'to' => $count($recipients['to'] ?? []),
+            'cc' => $count($recipients['cc'] ?? []),
+            'bcc' => $count($recipients['bcc'] ?? []),
+        ];
+    }
+
+    protected function renderRecipientValue(?string $value, array $payload): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $rendered = $this->renderString($value, $payload);
+        $trimmed = trim($rendered);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     protected function renderString(string $template, array $payload): string

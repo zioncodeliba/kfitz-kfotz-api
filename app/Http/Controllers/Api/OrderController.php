@@ -2514,14 +2514,13 @@ class OrderController extends Controller
     {
         try {
             $payload = $this->buildOrderEmailPayload($order);
-            $recipientList = $this->resolveOrderRecipients($order);
-            $recipients = [];
-
-            if (!empty($recipientList)) {
-                $recipients['to'] = $recipientList;
-            }
-
-            $this->emailTemplateService->send($eventKey, $payload, $recipients);
+            $this->emailTemplateService->send(
+                $eventKey,
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
         } catch (\Throwable $exception) {
             Log::warning('Failed to send order email notification', [
                 'event_key' => $eventKey,
