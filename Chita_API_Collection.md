@@ -168,3 +168,97 @@ P42
 String HH:MM
 Parcel preparation time
 This field is used in case your parcels are assembled at the shipping company warehouse.
+
+
+יש כמה אפשרוויות של שליחה
+ולכל אפשרות אנחנו משנים את p7 ו/או p23
+1- רגיל 
+p7 = 199
+p23 = לפי כמות סוג משלוח שהגדרתי בסוג משלוח הדיפןלט זה 1
+
+2- חריג 
+p7 = 155
+p23 = לפי כמות סוג משלוח שהגדרתי בסוג משלוח הדיפןלט זה 1
+
+3- משטח
+p7 = 170
+p23 = לפי כמות סוג משלוח שהגדרתי בסוג משלוח הדיפןלט זה 1
+
+4- משולב
+p7 = 199:170 - או כל האפשרויות שילוב שאני יכול לעשות עם 3 המספרי קוד של סוג מטען
+p23 = לפי כמות סוג משלוח שהגדרתי בסוג משלוח הדיפןלט זה 1
+** משולב יהיה רק אם בחלון הגדרת המשלוח יש יותר מיחידת משלוח אחת
+
+
+זו תשובה לדוגמא שאני מקבל:
+<?xml version="1.0" encoding="utf-8" ?>
+<root>
+    <result>ok</result>
+    <task>ws simple ship create answer</task>
+    <magic_enter_prog_yn>
+        <![CDATA[y]]>
+    </magic_enter_prog_yn>
+    <magic_return_data_yn>
+        <![CDATA[y]]>
+    </magic_return_data_yn>
+    <mydata>
+        <shgiya_yn>
+            <![CDATA[n]]>
+        </shgiya_yn>
+        <message>
+            <![CDATA[]]>
+        </message>
+        <answer>
+            <ship_create_num>
+                <![CDATA[94040383]]>
+            </ship_create_num>
+            <customer_number>
+                <![CDATA[26161]]>
+            </customer_number>
+            <ship_num_rand>
+                <![CDATA[7559404038326]]>
+            </ship_num_rand>
+            <distribution_line>
+                <![CDATA[150]]>
+            </distribution_line>
+            <distribution_line_desc>
+                <![CDATA[תל אביב מערב]]>
+            </distribution_line_desc>
+            <line_branch>
+                <![CDATA[1]]>
+            </line_branch>
+            <line_branch_desc>
+                <![CDATA[מרכז]]>
+            </line_branch_desc>
+            <section>
+                <![CDATA[]]>
+            </section>
+            <section_desc>
+                <![CDATA[]]>
+            </section_desc>
+            <ship_create_error>
+                <![CDATA[]]>
+            </ship_create_error>
+            <ship_create_error_code>
+                <![CDATA[]]>
+            </ship_create_error_code>
+            <distribution_point>
+                <![CDATA[]]>
+            </distribution_point>
+            <name_point>
+                <![CDATA[]]>
+            </name_point>
+            <address_point>
+                <![CDATA[]]>
+            </address_point>
+            <sorting_area_code>
+                <![CDATA[]]>
+            </sorting_area_code>
+        </answer>
+    </mydata>
+</root>
+
+מספר המשלוח שאני רוצה לשמור כtracking_number זה:
+<ship_create_num>
+                <![CDATA[94040383]]>
+            </ship_create_num>

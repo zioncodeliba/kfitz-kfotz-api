@@ -9,7 +9,7 @@ use Illuminate\Support\Collection;
 
 class ShippingSettingsService
 {
-    protected array $shippingSizeOptions = ['regular', 'oversized', 'pallet', 'box'];
+    protected array $shippingSizeOptions = ['regular', 'oversized', 'pallet'];
 
     protected array $shippingSizeSynonyms = [
         'standard' => 'regular',
@@ -20,8 +20,8 @@ class ShippingSettingsService
         'any' => 'regular',
         'small' => 'regular',
         'medium' => 'regular',
-        'box' => 'box',
-        'carton' => 'box',
+        'box' => 'regular',
+        'carton' => 'regular',
         'oversized' => 'oversized',
         'bulky' => 'oversized',
         'large' => 'oversized',

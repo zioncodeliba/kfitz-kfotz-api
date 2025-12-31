@@ -16,6 +16,8 @@ use App\Models\Merchant;
 use App\Services\ShippingSettingsService;
 use App\Services\EmailTemplateService;
 use App\Services\YpayInvoiceService;
+use App\Services\ChitaShipmentService;
+use App\Exceptions\ChitaShipmentException;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +37,8 @@ class OrderController extends Controller
 
     public function __construct(
         protected ShippingSettingsService $shippingSettingsService,
-        protected EmailTemplateService $emailTemplateService
+        protected EmailTemplateService $emailTemplateService,
+        protected ChitaShipmentService $chitaShipmentService
     ) {
     }
 
@@ -2093,6 +2096,8 @@ class OrderController extends Controller
             'cod_payment' => 'nullable|boolean',
             'cod_amount' => 'nullable|numeric|min:0',
             'cod_method' => 'nullable|string|max:191',
+            'cod_due_date' => 'nullable|string|max:32',
+            'cod_notes' => 'nullable|string|max:500',
             'shipment_notes' => 'nullable|string',
         ]);
         $previousShippingCost = (float) ($order->shipping_cost ?? 0);
@@ -2119,6 +2124,8 @@ class OrderController extends Controller
                         'cod_payment',
                         'cod_amount',
                         'cod_method',
+                        'cod_due_date',
+                        'cod_notes',
                         'shipment_notes',
                     ]
                 ),
@@ -2167,14 +2174,23 @@ class OrderController extends Controller
         if ($request->boolean('dispatch_shipment')) {
             $order->refresh();
             $merchant?->refresh();
-            $shipment = $this->dispatchShipmentForOrder(
-                $order,
-                $merchant,
-                $validated,
-                $request,
-                $carrier ?? $order->carrier,
-                $existingShipment
-            );
+            try {
+                $shipment = $this->dispatchShipmentForOrder(
+                    $order,
+                    $merchant,
+                    $validated,
+                    $request,
+                    $carrier ?? $order->carrier,
+                    $existingShipment
+                );
+            } catch (ChitaShipmentException $exception) {
+                Log::warning('Chita shipment creation failed', [
+                    'order_id' => $order->id,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return $this->errorResponse('Chita shipment failed: ' . $exception->getMessage(), 502);
+            }
             $order = $order->fresh(['items', 'carrier', 'user', 'merchant']);
         }
 
@@ -2273,6 +2289,8 @@ class OrderController extends Controller
             ? ($validated['cod_amount'] ?? null)
             : ($existingShipment?->cod_amount ?? null);
         $codMethodValue = $request->input('cod_method') ?? $existingShipment?->cod_method ?? null;
+        $codDueDateValue = $request->input('cod_due_date') ?? null;
+        $codNotesValue = $request->input('cod_notes') ?? null;
 
         $codPayment = $codPaymentRequested
             || ($codAmountValue !== null && $codAmountValue !== '')
@@ -2338,6 +2356,36 @@ class OrderController extends Controller
             }
         }
 
+        $trackingNumber = null;
+        if ($carrier && strtolower((string) $carrier->code) === 'chita') {
+            $shippingTypeValue = $validated['shipping_type']
+                ?? $order->shipping_type
+                ?? $request->input('shipping_type')
+                ?? 'delivery';
+
+            $shippingAddress = is_array($order->shipping_address) ? $order->shipping_address : [];
+            $destinationEmail = $destinationAddress['email']
+                ?? ($shippingAddress['email'] ?? $shippingAddress['contact_email'] ?? $order->user?->email ?? '');
+
+            $trackingNumber = $this->chitaShipmentService->createShipment([
+                'order_id' => $order->id,
+                'shipping_type' => $shippingTypeValue,
+                'company_name' => config('chita.company_name', 'TEST'),
+                'destination' => array_merge($destinationAddress, [
+                    'email' => $destinationEmail,
+                ]),
+                'shipping_units' => $shippingUnitsPayload,
+                'reference' => $order->order_number ?? (string) $order->id,
+                'reference_secondary' => (string) $order->id,
+                'shipment_notes' => $request->input('shipment_notes'),
+                'cod_payment' => $codPayment,
+                'cod_amount' => $codAmount,
+                'cod_method' => $codMethod,
+                'cod_due_date' => $codDueDateValue,
+                'cod_notes' => $codNotesValue,
+            ])['tracking_number'] ?? null;
+        }
+
         return DB::transaction(function () use (
             $order,
             $carrier,
@@ -2354,7 +2402,8 @@ class OrderController extends Controller
             $shippingUnitsPayload,
             $codMethod,
             $codCollected,
-            $codCollectedAt
+            $codCollectedAt,
+            $trackingNumber
         ) {
             $shipment = Shipment::firstOrNew(['order_id' => $order->id]);
 
@@ -2368,7 +2417,10 @@ class OrderController extends Controller
                 'carrier' => $carrierName,
                 'service_type' => $normalizedServiceType,
                 'package_type' => $packageType,
-                'tracking_number' => $request->input('tracking_number') ?? $order->tracking_number ?? ($shipment->exists ? $shipment->tracking_number : null),
+                'tracking_number' => $trackingNumber
+                    ?? $request->input('tracking_number')
+                    ?? $order->tracking_number
+                    ?? ($shipment->exists ? $shipment->tracking_number : null),
                 'origin_address' => $originAddress,
                 'destination_address' => $destinationAddress,
                 'shipping_cost' => $shippingCost,
@@ -2388,7 +2440,7 @@ class OrderController extends Controller
                 $shipment->addTrackingEvent('Shipment created', 'Shipment has been created and is pending pickup');
             }
 
-            $order->update([
+            $orderUpdates = [
                 'status' => 'shipped',
                 'shipping_cost' => $shippingCost,
                 'shipping_company' => $carrierName,
@@ -2396,7 +2448,13 @@ class OrderController extends Controller
                 'carrier_service_type' => $serviceType,
                 'shipping_method' => $normalizedServiceType,
                 'shipped_at' => now(),
-            ]);
+            ];
+
+            if ($trackingNumber) {
+                $orderUpdates['tracking_number'] = $trackingNumber;
+            }
+
+            $order->update($orderUpdates);
 
             return $shipment;
         });

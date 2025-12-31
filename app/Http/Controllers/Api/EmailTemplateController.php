@@ -138,7 +138,13 @@ class EmailTemplateController extends Controller
         $payload = $validated['payload'] ?? [];
         $recipients = $validated['recipients'] ?? [];
 
-        $log = $emailService->send($eventKey, $payload, $recipients);
+        $log = $emailService->send(
+            $eventKey,
+            $payload,
+            $recipients,
+            includeMailingList: true,
+            ignoreOverrideRecipients: true
+        );
 
         return $this->successResponse($log, 'Email event triggered');
     }

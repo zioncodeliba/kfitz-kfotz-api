@@ -341,7 +341,7 @@ class CashcowOrderSyncService
                         'origin_address' => $originAddress,
                         'destination_address' => $destinationAddress,
                         'service_type' => $serviceType,
-                        'package_type' => 'box',
+                        'package_type' => 'regular',
                         'carrier_id' => 14,
                         'shipping_cost' => $shippingCostValue,
                     ]);
