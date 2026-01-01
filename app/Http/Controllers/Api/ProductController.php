@@ -13,13 +13,15 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use App\Services\EmailTemplateService;
+use App\Services\CashcowProductPushService;
 
 class ProductController extends Controller
 {
     use ApiResponse;
 
     public function __construct(
-        protected EmailTemplateService $emailTemplateService
+        protected EmailTemplateService $emailTemplateService,
+        protected CashcowProductPushService $cashcowProductPushService
     ) {
     }
 
@@ -140,6 +142,8 @@ class ProductController extends Controller
 
         $product->load(['category', 'productVariations', 'shippingType']);
 
+        $this->pushProductToCashcow($product);
+
         return $this->createdResponse($product, 'Product created successfully');
     }
 
@@ -234,6 +238,11 @@ class ProductController extends Controller
 
         $product->load(['category', 'productVariations', 'shippingType']);
 
+        $cashcowFields = $this->resolveCashcowDeltaFields($request);
+        if (!empty($cashcowFields)) {
+            $this->pushProductDeltaToCashcow($product, $cashcowFields);
+        }
+
         if ($wasOutOfStock && $product->stock_quantity > 0) {
             $this->notifyProductBackInStock($product);
         }
@@ -253,6 +262,85 @@ class ProductController extends Controller
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    protected function pushProductToCashcow(Product $product): void
+    {
+        try {
+            $result = $this->cashcowProductPushService->createProduct($product);
+            if (isset($result['success']) && $result['success'] === false) {
+                Log::warning('Cashcow product push returned unsuccessful response', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'response' => $result,
+                ]);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Cashcow product push failed', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @param array<int, string> $fields
+     */
+    protected function pushProductDeltaToCashcow(Product $product, array $fields): void
+    {
+        try {
+            $result = $this->cashcowProductPushService->updateProductDelta($product, $fields);
+            if (isset($result['success']) && $result['success'] === false) {
+                Log::warning('Cashcow product delta push returned unsuccessful response', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'response' => $result,
+                ]);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Cashcow product delta push failed', [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveCashcowDeltaFields(Request $request): array
+    {
+        $fields = [];
+
+        if ($request->has('name')) {
+            $fields[] = 'title';
+        }
+
+        if ($request->has('description')) {
+            $fields[] = 'short_description';
+            $fields[] = 'long_description';
+        }
+
+        if ($request->has('category_id')) {
+            $fields[] = 'main_category_name';
+        }
+
+        if ($request->has('stock_quantity')) {
+            $fields[] = 'qty';
+        }
+
+        if ($request->has('is_active')) {
+            $fields[] = 'is_visible';
+        }
+
+        if ($request->has('variations')) {
+            $fields[] = 'attributes';
+            $fields[] = 'attributes_matrix';
+        }
+
+        return array_values(array_unique($fields));
     }
 
     protected function buildProductBackInStockPayload(Product $product): array
