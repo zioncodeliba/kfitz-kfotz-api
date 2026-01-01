@@ -6,11 +6,14 @@ use App\Models\EmailLog;
 use App\Models\EmailTemplate;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class EmailTemplateService
 {
+    public function __construct(private InforuEmailService $inforuEmailService)
+    {
+    }
+
     public function send(
         string $eventKey,
         array $payload,
@@ -74,6 +77,8 @@ class EmailTemplateService
         $renderedSubject = $this->renderString($template->subject, $payload);
         $renderedHtml = $template->body_html ? $this->renderString($template->body_html, $payload) : null;
         $renderedText = $template->body_text ? $this->renderString($template->body_text, $payload) : null;
+        $body = $this->inforuEmailService->buildBody($renderedHtml, $renderedText);
+        $sendRecipients = $this->flattenRecipients($resolvedRecipients);
 
         $log = EmailLog::create([
             'email_template_id' => $template->id,
@@ -94,34 +99,20 @@ class EmailTemplateService
         ]);
 
         try {
-            Mail::send([], [], function ($message) use ($resolvedRecipients, $renderedSubject, $renderedHtml, $renderedText) {
-                foreach ($resolvedRecipients['to'] as $recipient) {
-                    $message->to($recipient['email'], $recipient['name'] ?? null);
-                }
+            $result = $this->inforuEmailService->sendEmail($sendRecipients, $renderedSubject, $body, [
+                'event_key' => $eventKey,
+                'campaign_ref_id' => (string) $log->id,
+            ]);
 
-                foreach ($resolvedRecipients['cc'] as $recipient) {
-                    $message->cc($recipient['email'], $recipient['name'] ?? null);
-                }
-
-                foreach ($resolvedRecipients['bcc'] as $recipient) {
-                    $message->bcc($recipient['email'], $recipient['name'] ?? null);
-                }
-
-                $message->subject($renderedSubject);
-
-                if ($renderedHtml) {
-                    $message->html($renderedHtml);
-                    if ($renderedText) {
-                        $message->text($renderedText);
-                    }
-                } elseif ($renderedText) {
-                    $message->text($renderedText);
-                }
-            });
+            $meta = $log->meta ?? [];
+            $meta['provider'] = 'inforu';
+            $meta['campaign'] = $result['campaign'] ?? null;
+            $meta['provider_response'] = $result['response'] ?? null;
 
             $log->update([
                 'status' => 'sent',
                 'sent_at' => now(),
+                'meta' => $meta,
             ]);
         } catch (Throwable $exception) {
             Log::error('Email send failed', [
@@ -129,9 +120,12 @@ class EmailTemplateService
                 'error' => $exception->getMessage(),
             ]);
 
+            $meta = $log->meta ?? [];
+            $meta['provider'] = 'inforu';
             $log->update([
                 'status' => 'failed',
                 'error_message' => $exception->getMessage(),
+                'meta' => $meta,
             ]);
         }
 
@@ -278,6 +272,25 @@ class EmailTemplateService
         }
 
         return $base;
+    }
+
+    protected function flattenRecipients(array $groups): array
+    {
+        $merged = array_merge($groups['to'] ?? [], $groups['cc'] ?? [], $groups['bcc'] ?? []);
+        $seen = [];
+        $unique = [];
+
+        foreach ($merged as $recipient) {
+            $email = strtolower($recipient['email'] ?? '');
+            if ($email === '' || isset($seen[$email])) {
+                continue;
+            }
+
+            $unique[] = $recipient;
+            $seen[$email] = true;
+        }
+
+        return $unique;
     }
 
     protected function hasAnyRecipient(array $recipients): bool

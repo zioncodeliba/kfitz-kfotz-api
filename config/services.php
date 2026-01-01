@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'inforu' => [
+        'base_url' => env('INFORU_BASE_URL', 'https://capi.inforu.co.il'),
+        'basic_auth' => env('INFORU_BASIC_AUTH'),
+        'from_address' => env('INFORU_FROM_ADDRESS', env('MAIL_FROM_ADDRESS')),
+        'from_name' => env('INFORU_FROM_NAME', env('MAIL_FROM_NAME')),
+        'reply_address' => env('INFORU_REPLY_ADDRESS', ''),
+        'campaign_prefix' => env('INFORU_CAMPAIGN_PREFIX', 'kfitz'),
+        'timeout' => env('INFORU_TIMEOUT', 20),
+    ],
+
 ];

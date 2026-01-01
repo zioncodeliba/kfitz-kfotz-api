@@ -9,6 +9,8 @@ use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\Shipment;
 use App\Models\User;
+use App\Services\EmailTemplateService;
+use App\Services\OrderEmailPayloadService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -22,7 +24,10 @@ class CashcowOrderSyncService
     protected int $pageSize;
     protected string $targetSiteUrl;
 
-    public function __construct()
+    public function __construct(
+        protected EmailTemplateService $emailTemplateService,
+        protected OrderEmailPayloadService $orderEmailPayloadService
+    )
     {
         $this->baseUrl = rtrim((string) config('cashcow.base_url'), '/');
         $this->token = (string) config('cashcow.token');
@@ -192,6 +197,7 @@ class CashcowOrderSyncService
 
         $shipping = $this->mapShippingType((int) ($payload['ShipingType'] ?? 0));
         $statusContext = $this->mapStatus((int) ($payload['OrderStatus'] ?? 0));
+        $orderStatusId = (int) ($payload['OrderStatus'] ?? 0);
         $customer = $this->syncMerchantCustomer($merchantUser->id, $payload);
         $itemsContext = $this->normalizeItems($payload['Products'] ?? []);
 
@@ -271,7 +277,9 @@ class CashcowOrderSyncService
             'notes' => $payload['CustomerInstructions'] ?? null,
         ];
 
-        return DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, $site) {
+        $createdOrder = null;
+
+        $action = DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, &$createdOrder) {
             $order = Order::where('source', 'cashcow')
                 ->where('source_reference', $orderPayload['source_reference'])
                 ->first();
@@ -284,6 +292,7 @@ class CashcowOrderSyncService
                 $order->order_number = $orderNumber;
                 $order->save();
                 $action = 'created';
+                $createdOrder = $order;
             } else {
                 // Existing order: skip to avoid overriding manual changes.
                 return 'skipped_existing';
@@ -350,6 +359,54 @@ class CashcowOrderSyncService
 
             return $action;
         });
+
+        if ($action === 'created' && $createdOrder) {
+            $this->triggerCashcowOrderEvent($createdOrder, $orderStatusId, $shipping, $statusContext);
+        }
+
+        return $action;
+    }
+
+    protected function triggerCashcowOrderEvent(
+        Order $order,
+        int $orderStatusId,
+        array $shipping,
+        array $statusContext
+    ): void {
+        $eventKey = null;
+        $shippingType = $shipping['type'] ?? $order->shipping_type;
+        $paymentStatus = $order->payment_status ?? ($statusContext['payment_status'] ?? null);
+
+        if ($orderStatusId === 2) {
+            $eventKey = 'order.cashcow.lead';
+        } elseif ($shippingType === 'pickup') {
+            $eventKey = 'order.cashcow.pickup_created';
+        } elseif ($paymentStatus === 'paid') {
+            $eventKey = 'order.created_paid';
+        } else {
+            $eventKey = 'order.cashcow.unpaid';
+        }
+
+        if (!$eventKey) {
+            return;
+        }
+
+        try {
+            $payload = $this->orderEmailPayloadService->build($order);
+            $this->emailTemplateService->send(
+                $eventKey,
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send Cashcow order notification', [
+                'order_id' => $order->id,
+                'event_key' => $eventKey,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     protected function normalizeItems(array $items): array

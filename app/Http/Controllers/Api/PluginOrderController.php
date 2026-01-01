@@ -11,6 +11,8 @@ use App\Models\Product;
 use App\Models\ProductVariation;
 use App\Models\SystemSetting;
 use App\Services\YpayInvoiceService;
+use App\Services\EmailTemplateService;
+use App\Services\OrderEmailPayloadService;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesPluginPricing;
 use Illuminate\Http\Request;
@@ -21,6 +23,12 @@ class PluginOrderController extends Controller
 {
     use ApiResponse;
     use HandlesPluginPricing;
+
+    public function __construct(
+        protected EmailTemplateService $emailTemplateService,
+        protected OrderEmailPayloadService $orderEmailPayloadService
+    ) {
+    }
 
     public function store(Request $request, YpayInvoiceService $ypayInvoiceService)
     {
@@ -380,6 +388,8 @@ class PluginOrderController extends Controller
                 }
             }
 
+            $this->notifyPluginOrderCreated($order);
+
             return $this->createdResponse(
                 $order->load(['items', 'merchant', 'user']),
                 'Order created from plugin successfully'
@@ -437,6 +447,25 @@ class PluginOrderController extends Controller
             'method' => $method,
             'cost' => $cost,
         ];
+    }
+
+    protected function notifyPluginOrderCreated(Order $order): void
+    {
+        try {
+            $payload = $this->orderEmailPayloadService->build($order);
+            $this->emailTemplateService->send(
+                'order.created_paid',
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send plugin order notification', [
+                'order_id' => $order->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     protected function normalizeShippingMethod(?string $method, string $type): string

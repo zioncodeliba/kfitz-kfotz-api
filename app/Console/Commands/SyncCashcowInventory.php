@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Services\CashcowInventorySyncService;
+use App\Services\InforuEmailService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SyncCashcowInventory extends Command
@@ -14,7 +14,7 @@ class SyncCashcowInventory extends Command
 
     protected $description = 'Sync product inventory and variations from Cashcow API';
 
-    public function handle(CashcowInventorySyncService $syncService): int
+    public function handle(CashcowInventorySyncService $syncService, InforuEmailService $emailService): int
     {
         $logLines = [];
         Log::info('Cashcow inventory sync started');
@@ -53,7 +53,7 @@ class SyncCashcowInventory extends Command
             $this->error('Sync failed: ' . $e->getMessage());
             report($e);
             Log::error('Cashcow inventory sync failed', ['exception' => $e]);
-            $this->sendReport($logLines, [
+            $this->sendReport($emailService, $logLines, [
                 'status' => 'failed',
                 'error' => $e->getMessage(),
             ]);
@@ -76,7 +76,7 @@ class SyncCashcowInventory extends Command
             Log::warning('[Cashcow] Missing SKUs', ['missing' => $result['missing_products']]);
         }
 
-        $this->sendReport($logLines, [
+        $this->sendReport($emailService, $logLines, [
             'status' => 'success',
             'summary' => $summary,
             'missing' => $result['missing_products'] ?? [],
@@ -85,7 +85,7 @@ class SyncCashcowInventory extends Command
         return self::SUCCESS;
     }
 
-    private function sendReport(array $logLines, array $meta = []): void
+    private function sendReport(InforuEmailService $emailService, array $logLines, array $meta = []): void
     {
         $email = config('cashcow.notify_email');
         if (empty($email)) {
@@ -106,11 +106,22 @@ class SyncCashcowInventory extends Command
 
         $body = implode("\n", $lines);
 
-        Mail::raw($body, function ($message) use ($email, $meta) {
-            $status = $meta['status'] ?? 'result';
-            $message->to($email)
-                ->subject(sprintf('[Cashcow Sync] %s (%s)', ucfirst($status), now()->toDateTimeString()));
-        });
+        $subject = sprintf('[Cashcow Sync] %s (%s)', ucfirst($meta['status'] ?? 'result'), now()->toDateTimeString());
+        $htmlBody = $emailService->buildBody(null, $body);
+
+        try {
+            $emailService->sendEmail([
+                ['email' => $email],
+            ], $subject, $htmlBody, [
+                'event_key' => 'cashcow.inventory_report',
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('[Cashcow] report email failed', [
+                'to' => $email,
+                'error' => $exception->getMessage(),
+            ]);
+            return;
+        }
 
         Log::info('[Cashcow] report email dispatched', [
             'to' => $email,

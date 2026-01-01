@@ -5,10 +5,13 @@ namespace App\Services;
 use App\Models\EmailLog;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class MailBroadcastService
 {
+    public function __construct(private InforuEmailService $inforuEmailService)
+    {
+    }
+
     public function sendEmail(array $recipients, string $subjectTemplate, string $bodyTemplate): array
     {
         $results = [
@@ -32,6 +35,7 @@ class MailBroadcastService
             $renderedSubject = $this->renderString($subjectTemplate, $payload);
             $renderedHtml = $this->renderString($bodyTemplate, $payload);
             $renderedText = strip_tags($renderedHtml);
+            $body = $this->inforuEmailService->buildBody($renderedHtml, $renderedText);
 
             $log = EmailLog::create([
                 'email_template_id' => null,
@@ -52,19 +56,24 @@ class MailBroadcastService
             ]);
 
             try {
-                Mail::send([], [], function ($message) use ($recipient, $renderedSubject, $renderedHtml, $renderedText) {
-                    $message->to($recipient['email'], $recipient['name'] ?? null)
-                        ->subject($renderedSubject)
-                        ->html($renderedHtml);
+                $result = $this->inforuEmailService->sendEmail([
+                    [
+                        'email' => $recipient['email'],
+                        'name' => $recipient['name'] ?? null,
+                    ],
+                ], $renderedSubject, $body, [
+                    'event_key' => 'broadcast.manual',
+                    'campaign_ref_id' => (string) $log->id,
+                ]);
 
-                    if (!empty($renderedText)) {
-                        $message->text($renderedText);
-                    }
-                });
-
+                $meta = $log->meta ?? [];
+                $meta['provider'] = 'inforu';
+                $meta['campaign'] = $result['campaign'] ?? null;
+                $meta['provider_response'] = $result['response'] ?? null;
                 $log->update([
                     'status' => 'sent',
                     'sent_at' => now(),
+                    'meta' => $meta,
                 ]);
 
                 $results['sent']++;
@@ -74,9 +83,12 @@ class MailBroadcastService
                     'error' => $exception->getMessage(),
                 ]);
 
+                $meta = $log->meta ?? [];
+                $meta['provider'] = 'inforu';
                 $log->update([
                     'status' => 'failed',
                     'error_message' => $exception->getMessage(),
+                    'meta' => $meta,
                 ]);
 
                 $results['failed']++;

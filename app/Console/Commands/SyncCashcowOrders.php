@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Services\CashcowOrderSyncService;
+use App\Services\InforuEmailService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 class SyncCashcowOrders extends Command
@@ -14,7 +14,7 @@ class SyncCashcowOrders extends Command
 
     protected $description = 'Sync orders from Cashcow API into the system';
 
-    public function handle(CashcowOrderSyncService $service): int
+    public function handle(CashcowOrderSyncService $service, InforuEmailService $emailService): int
     {
         $maxPages = (int) $this->option('max-pages');
         $maxPages = $maxPages > 0 ? $maxPages : 1;
@@ -70,7 +70,7 @@ class SyncCashcowOrders extends Command
         } catch (Throwable $e) {
             $this->error('Cashcow order sync failed: ' . $e->getMessage());
             Log::error('[Cashcow] order sync failed', ['exception' => $e]);
-            $this->sendReport($logLines, [
+            $this->sendReport($emailService, $logLines, [
                 'status' => 'failed',
                 'error' => $e->getMessage(),
             ]);
@@ -97,7 +97,7 @@ class SyncCashcowOrders extends Command
             $logLines[] = 'Skipped orders: ' . json_encode($skippedOrders);
         }
 
-        $this->sendReport($logLines, [
+        $this->sendReport($emailService, $logLines, [
             'status' => 'success',
             'summary' => $summaryLine,
             'skipped' => $skippedOrders,
@@ -106,7 +106,7 @@ class SyncCashcowOrders extends Command
         return self::SUCCESS;
     }
 
-    private function sendReport(array $logLines, array $meta = []): void
+    private function sendReport(InforuEmailService $emailService, array $logLines, array $meta = []): void
     {
         $email = config('cashcow.notify_email');
         if (empty($email)) {
@@ -127,11 +127,22 @@ class SyncCashcowOrders extends Command
 
         $body = implode("\n", $lines);
 
-        Mail::raw($body, function ($message) use ($email, $meta) {
-            $status = $meta['status'] ?? 'result';
-            $message->to($email)
-                ->subject(sprintf('[Cashcow Orders Sync] %s (%s)', ucfirst($status), now()->toDateTimeString()));
-        });
+        $subject = sprintf('[Cashcow Orders Sync] %s (%s)', ucfirst($meta['status'] ?? 'result'), now()->toDateTimeString());
+        $htmlBody = $emailService->buildBody(null, $body);
+
+        try {
+            $emailService->sendEmail([
+                ['email' => $email],
+            ], $subject, $htmlBody, [
+                'event_key' => 'cashcow.orders_report',
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('[Cashcow] orders sync report failed', [
+                'to' => $email,
+                'error' => $exception->getMessage(),
+            ]);
+            return;
+        }
 
         Log::info('[Cashcow] orders sync report dispatched', [
             'to' => $email,

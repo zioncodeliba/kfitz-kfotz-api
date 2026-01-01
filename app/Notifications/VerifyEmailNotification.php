@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\InforuMailChannel;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,6 +33,11 @@ class VerifyEmailNotification extends VerifyEmail
      * @param  mixed  $notifiable
      * @return void
      */
+    public function via($notifiable)
+    {
+        return [InforuMailChannel::class];
+    }
+
     public function toMail($notifiable)
     {
         $verificationUrl = $this->verificationUrl($notifiable);
@@ -49,6 +55,26 @@ class VerifyEmailNotification extends VerifyEmail
         $this->lastMailMessage = $mailMessage;
 
         return $mailMessage;
+    }
+
+    public function toInforuMail($notifiable): array
+    {
+        $verificationUrl = $this->verificationUrl($notifiable);
+
+        $intro = e('Please click the button below to verify your email address.');
+        $actionText = e('Verify Email Address');
+        $outro = e('If you did not create an account, no further action is required.');
+        $url = e($verificationUrl);
+
+        $body = '<p>' . $intro . '</p><p><a href="' . $url . '">' . $actionText . '</a></p><p>' . $outro . '</p>';
+
+        return [
+            'subject' => 'Verify Email Address',
+            'body' => $body,
+            'options' => [
+                'event_key' => 'auth.verify_email',
+            ],
+        ];
     }
 
     /**

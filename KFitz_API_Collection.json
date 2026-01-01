@@ -990,6 +990,68 @@
           }
         },
         {
+          "name": "Create order (delivery)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"delivery\",\n  \"shipping_method\": \"regular\",\n  \"shipping_cost\": 29.9,\n  \"billing_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"תובל 32\",\n    \"city\": \"רמת גן\",\n    \"zip\": \"52522\",\n    \"country\": \"IL\",\n    \"notes\": \"לתאם מסירה מראש\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"הזמנת משלוח לבדיקה\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order (pickup)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"merchant_customer_id\": \"{{merchant_customer_id}}\",\n  \"shipping_type\": \"pickup\",\n  \"shipping_method\": \"pickup\",\n  \"shipping_cost\": 0,\n  \"billing_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\"\n  },\n  \"shipping_address\": {\n    \"name\": \"רות כהן\",\n    \"phone\": \"+972500000000\",\n    \"street\": \"הרצל 12\",\n    \"city\": \"פתח תקווה\",\n    \"zip\": \"49300\",\n    \"country\": \"IL\",\n    \"notes\": \"איסוף עצמי\"\n  },\n  \"items\": [\n    {\n      \"product_id\": \"{{product_id}}\",\n      \"variation_id\": \"{{product_variation_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"notes\": \"הזמנת איסוף עצמי לבדיקה\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "Create order (missing variation - expect 422)",
           "request": {
             "method": "POST",

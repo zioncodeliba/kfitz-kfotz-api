@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\MerchantPopup;
-use App\Notifications\VerifyEmailNotification;
+use App\Services\InforuEmailService;
 
 class AuthController extends Controller
 {
@@ -96,7 +96,7 @@ class AuthController extends Controller
         return $this->successResponse(new UserResource($user));
     }
 
-    public function forgotPassword(Request $request)
+    public function forgotPassword(Request $request, InforuEmailService $emailService)
     {
         $request->validate(['email' => 'required|email']);
         $user = User::where('email', $request->email)->first();
@@ -106,10 +106,15 @@ class AuthController extends Controller
         $token = app('auth.password.broker')->createToken($user);
         $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
         $resetUrl = $frontendUrl . '/reset-password?token=' . urlencode($token) . '&email=' . urlencode($user->email);
-        // שליחת מייל (פשוטה, אפשר להחליף ל־Notification)
-        \Mail::raw('Reset your password: ' . $resetUrl, function ($message) use ($user) {
-            $message->to($user->email)->subject('Password Reset');
-        });
+        $body = $emailService->buildBody(null, 'Reset your password: ' . $resetUrl);
+        $emailService->sendEmail([
+            [
+                'email' => $user->email,
+                'name' => $user->name,
+            ],
+        ], 'Password Reset', $body, [
+            'event_key' => 'auth.password_reset',
+        ]);
         return $this->successResponse(null, 'Password reset email sent');
     }
 

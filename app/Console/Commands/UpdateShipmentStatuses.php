@@ -4,9 +4,12 @@ namespace App\Console\Commands;
 
 use App\Models\Order;
 use App\Models\Shipment;
+use App\Services\EmailTemplateService;
+use App\Services\OrderEmailPayloadService;
 use App\Services\ShipmentStatusSimulator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class UpdateShipmentStatuses extends Command
 {
@@ -14,7 +17,11 @@ class UpdateShipmentStatuses extends Command
 
     protected $description = 'Simulate updates from shipping providers and advance shipment statuses';
 
-    public function __construct(protected ShipmentStatusSimulator $simulator)
+    public function __construct(
+        protected ShipmentStatusSimulator $simulator,
+        protected EmailTemplateService $emailTemplateService,
+        protected OrderEmailPayloadService $orderEmailPayloadService
+    )
     {
         parent::__construct();
     }
@@ -52,7 +59,10 @@ class UpdateShipmentStatuses extends Command
                 continue;
             }
 
-            DB::transaction(function () use ($shipment, $order, $result) {
+            $previousOrderStatus = $order->status;
+            $shouldNotifyDelivered = false;
+
+            DB::transaction(function () use ($shipment, $order, $result, $previousOrderStatus, &$shouldNotifyDelivered) {
                 $shipment->fill([
                     'status' => $result['status'],
                 ] + ($result['timestamps'] ?? []));
@@ -72,6 +82,9 @@ class UpdateShipmentStatuses extends Command
 
                     if ($result['order_status'] === Order::STATUS_DELIVERED) {
                         $updates['delivered_at'] = now();
+                        if ($previousOrderStatus !== Order::STATUS_DELIVERED) {
+                            $shouldNotifyDelivered = true;
+                        }
                     }
 
                     if ($result['order_status'] === Order::STATUS_SHIPPED && !$order->shipped_at) {
@@ -81,6 +94,25 @@ class UpdateShipmentStatuses extends Command
                     $order->update($updates);
                 }
             });
+
+            if ($shouldNotifyDelivered) {
+                try {
+                    $order->refresh();
+                    $payload = $this->orderEmailPayloadService->build($order);
+                    $this->emailTemplateService->send(
+                        'order.delivered',
+                        $payload,
+                        [],
+                        includeMailingList: true,
+                        ignoreOverrideRecipients: true
+                    );
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to send delivered notification', [
+                        'order_id' => $order->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
 
             $this->info(sprintf(
                 'Shipment %s advanced to %s',

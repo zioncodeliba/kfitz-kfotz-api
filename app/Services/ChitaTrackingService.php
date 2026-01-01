@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Shipment;
 use App\Models\Order;
+use App\Services\EmailTemplateService;
+use App\Services\OrderEmailPayloadService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -11,6 +13,12 @@ use SimpleXMLElement;
 
 class ChitaTrackingService
 {
+    public function __construct(
+        protected EmailTemplateService $emailTemplateService,
+        protected OrderEmailPayloadService $orderEmailPayloadService
+    ) {
+    }
+
     public function fetchShipmentData(string $shipNumber): ?array
     {
         $token = trim((string) config('chita.token'));
@@ -90,6 +98,8 @@ class ChitaTrackingService
             $data['statuses'] ?? []
         );
 
+        $orderForNotification = null;
+
         if ($shipment->status !== $newStatus) {
             $shipment->updateStatus($newStatus);
 
@@ -101,12 +111,31 @@ class ChitaTrackingService
                         $updates['delivered_at'] = now();
                     }
                     $order->update($updates);
+                    $orderForNotification = $order;
                 }
             }
         }
 
         $shipment->tracking_events = $events;
         $shipment->save();
+
+        if ($orderForNotification) {
+            try {
+                $payload = $this->orderEmailPayloadService->build($orderForNotification);
+                $this->emailTemplateService->send(
+                    'order.delivered',
+                    $payload,
+                    [],
+                    includeMailingList: true,
+                    ignoreOverrideRecipients: true
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to send delivered notification', [
+                    'order_id' => $orderForNotification->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return $newStatus;
     }
