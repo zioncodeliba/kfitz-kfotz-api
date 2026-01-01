@@ -2376,8 +2376,10 @@ class OrderController extends Controller
             }
         }
 
-        $trackingNumber = null;
-        if ($carrier && strtolower((string) $carrier->code) === 'chita') {
+        $requestedTrackingNumber = trim((string) $request->input('tracking_number'));
+        $trackingNumber = $requestedTrackingNumber !== '' ? $requestedTrackingNumber : null;
+
+        if ($carrier && strtolower((string) $carrier->code) === 'chita' && $trackingNumber === null) {
             $shippingTypeValue = $validated['shipping_type']
                 ?? $order->shipping_type
                 ?? $request->input('shipping_type')
