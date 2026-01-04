@@ -104,8 +104,7 @@ class AuthController extends Controller
             return $this->notFoundResponse('User not found');
         }
         $token = app('auth.password.broker')->createToken($user);
-        $frontendUrl = rtrim(config('app.frontend_url', config('app.url')), '/');
-        $resetUrl = $frontendUrl . '/reset-password?token=' . urlencode($token) . '&email=' . urlencode($user->email);
+        $resetUrl = $this->buildPasswordResetUrl($token, $user->email);
         $body = $emailService->buildBody(null, 'Reset your password: ' . $resetUrl);
         $emailService->sendEmail([
             [
@@ -136,5 +135,29 @@ class AuthController extends Controller
             return $this->successResponse(null, 'Password reset successful');
         }
         return $this->errorResponse('Invalid token or email', 400);
+    }
+
+    private function buildPasswordResetUrl(string $token, string $email): string
+    {
+        $frontendUrl = trim((string) config('app.frontend_url', config('app.url', '')));
+        if ($frontendUrl === '') {
+            $frontendUrl = (string) config('app.url');
+        }
+
+        $query = http_build_query([
+            'token' => $token,
+            'email' => $email,
+        ], '', '&', PHP_QUERY_RFC3986);
+
+        if (str_contains($frontendUrl, '#')) {
+            [$base, $hash] = explode('#', $frontendUrl, 2);
+            $base = rtrim($base, '/');
+            $hashPath = trim($hash ?? '', '/');
+            $hashPath = $hashPath === '' ? 'reset-password' : $hashPath . '/reset-password';
+
+            return $base . '/#/' . $hashPath . '?' . $query;
+        }
+
+        return rtrim($frontendUrl, '/') . '/reset-password?' . $query;
     }
 }
