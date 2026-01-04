@@ -149,15 +149,17 @@ class AuthController extends Controller
             'email' => $email,
         ], '', '&', PHP_QUERY_RFC3986);
 
+        $base = $frontendUrl;
+        $hashPath = '';
+
         if (str_contains($frontendUrl, '#')) {
             [$base, $hash] = explode('#', $frontendUrl, 2);
-            $base = rtrim($base, '/');
             $hashPath = trim($hash ?? '', '/');
-            $hashPath = $hashPath === '' ? 'reset-password' : $hashPath . '/reset-password';
-
-            return $base . '/#/' . $hashPath . '?' . $query;
         }
 
-        return rtrim($frontendUrl, '/') . '/reset-password?' . $query;
+        $base = rtrim($base, '/');
+        $hashPath = $hashPath === '' ? 'reset-password' : $hashPath . '/reset-password';
+
+        return $base . '/#/' . $hashPath . '?' . $query;
     }
 }
