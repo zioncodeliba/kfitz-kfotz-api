@@ -240,7 +240,22 @@ class ProductController extends Controller
 
         $cashcowFields = $this->resolveCashcowDeltaFields($request);
         if (!empty($cashcowFields)) {
-            $this->pushProductDeltaToCashcow($product, $cashcowFields);
+            try {
+                $this->pushProductDeltaToCashcow($product, $cashcowFields);
+            } catch (\Throwable $exception) {
+                Log::warning('Cashcow product delta push failed', [
+                    'product_id' => $product->id,
+                    'sku' => $product->sku,
+                    'fields' => $cashcowFields,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cashcow update failed.',
+                    'cashcow_error' => $exception->getMessage(),
+                ], 502);
+            }
         }
 
         if ($wasOutOfStock && $product->stock_quantity > 0) {
@@ -289,21 +304,19 @@ class ProductController extends Controller
      */
     protected function pushProductDeltaToCashcow(Product $product, array $fields): void
     {
-        try {
-            $result = $this->cashcowProductPushService->updateProductDelta($product, $fields);
-            if (isset($result['success']) && $result['success'] === false) {
-                Log::warning('Cashcow product delta push returned unsuccessful response', [
-                    'product_id' => $product->id,
-                    'sku' => $product->sku,
-                    'response' => $result,
-                ]);
+        $result = $this->cashcowProductPushService->updateProductDelta($product, $fields);
+
+        if (isset($result['status']) && $result['status'] === 'skipped') {
+            $reason = $this->formatCashcowSkipReason($result['reason'] ?? null);
+            throw new \RuntimeException($reason);
+        }
+
+        if (isset($result['success']) && $result['success'] === false) {
+            $error = $result['error'] ?? 'Unknown error';
+            if (!is_string($error)) {
+                $error = json_encode($error);
             }
-        } catch (\Throwable $exception) {
-            Log::warning('Cashcow product delta push failed', [
-                'product_id' => $product->id,
-                'sku' => $product->sku,
-                'error' => $exception->getMessage(),
-            ]);
+            throw new \RuntimeException('Cashcow API error: ' . $error);
         }
     }
 
@@ -341,6 +354,18 @@ class ProductController extends Controller
         }
 
         return array_values(array_unique($fields));
+    }
+
+    protected function formatCashcowSkipReason(?string $reason): string
+    {
+        return match ($reason) {
+            'not_configured' => 'Cashcow configuration is missing (CASHCOW_TOKEN/CASHCOW_STORE_ID).',
+            'missing_sku' => 'Product SKU is missing.',
+            'no_fields' => 'No fields were provided for Cashcow update.',
+            default => $reason
+                ? 'Cashcow update skipped: ' . $reason . '.'
+                : 'Cashcow update skipped for an unknown reason.',
+        };
     }
 
     protected function buildProductBackInStockPayload(Product $product): array
