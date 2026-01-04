@@ -9,6 +9,9 @@ use App\Console\Commands\SyncCashcowInventory;
 use App\Console\Commands\SyncChitaShipmentsCommand;
 use App\Console\Commands\SyncCashcowOrders;
 use App\Console\Commands\PushCashcowInventory;
+use App\Console\Commands\ImportCashcowImages;
+use App\Console\Commands\ImportProductPricingFromCsv;
+use App\Console\Commands\SyncMerchantsFromCsv;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -23,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         SyncChitaShipmentsCommand::class,
         SyncCashcowOrders::class,
         PushCashcowInventory::class,
+        ImportCashcowImages::class,
+        ImportProductPricingFromCsv::class,
+        SyncMerchantsFromCsv::class,
     ])
    ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
@@ -33,9 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         // $schedule->command('shipments:update-statuses')->everyFiveMinutes();
         // $schedule->command('cashcow:sync-inventory')->everyTenMinutes();
-        // $schedule->command('cashcow:push-inventory')->everyTenMinutes();
+        $schedule->command('cashcow:push-inventory')->everyTenMinutes();
         $schedule->command('chita:sync-statuses')->everyTenMinutes();
-        // $schedule->command('cashcow:sync-orders')->everyTenMinutes();
+        $schedule->command('cashcow:sync-orders')->everyTenMinutes();
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {
