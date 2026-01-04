@@ -4,6 +4,9 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\ProductVariation;
+use App\Models\MerchantSite;
+use App\Models\SystemSetting;
+use App\Traits\HandlesPluginPricing;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,12 +15,18 @@ use RuntimeException;
 
 class CashcowProductPushService
 {
+    use HandlesPluginPricing;
+
     private const MAX_SAMPLE_ITEMS = 50;
 
     protected string $baseUrl;
     protected string $token;
     protected string $storeId;
     protected int $chunkSize;
+    protected string $priceField;
+    protected string $imageField;
+    protected bool $priceSiteResolved = false;
+    protected ?int $priceSiteId = null;
 
     public function __construct()
     {
@@ -25,6 +34,8 @@ class CashcowProductPushService
         $this->token = (string) config('cashcow.token');
         $this->storeId = (string) config('cashcow.store_id');
         $this->chunkSize = (int) config('cashcow.push_chunk_size', 100);
+        $this->priceField = (string) config('cashcow.price_field', 'price');
+        $this->imageField = (string) config('cashcow.image_field', 'image_url');
     }
 
     public function isConfigured(): bool
@@ -314,6 +325,21 @@ class CashcowProductPushService
             $payload['is_visible'] = (bool) $product->is_active;
         }
 
+        if ($includeMap === null || isset($includeMap['price'])) {
+            $priceField = trim($this->priceField);
+            if ($priceField !== '') {
+                $this->setPayloadValue($payload, $priceField, $this->resolveCashcowPriceWithVat($product));
+            }
+        }
+
+        if ($includeMap === null || isset($includeMap['image'])) {
+            $imageField = trim($this->imageField);
+            $imageUrl = $this->resolvePrimaryImageUrl($product);
+            if ($imageField !== '' && $imageUrl !== null) {
+                $this->setPayloadValue($payload, $imageField, $imageUrl);
+            }
+        }
+
         $includeAttributes = $includeMap === null
             || isset($includeMap['attributes'])
             || isset($includeMap['attributes_matrix']);
@@ -341,6 +367,158 @@ class CashcowProductPushService
         }
 
         return $payload;
+    }
+
+    private function resolvePrimaryImageUrl(Product $product): ?string
+    {
+        $images = is_array($product->images) ? $product->images : [];
+        $primary = null;
+
+        foreach ($images as $image) {
+            if (!is_string($image)) {
+                continue;
+            }
+            $trimmed = trim($image);
+            if ($trimmed !== '') {
+                $primary = $trimmed;
+                break;
+            }
+        }
+
+        if ($primary === null) {
+            return null;
+        }
+
+        if (Str::startsWith($primary, ['http://', 'https://'])) {
+            return $primary;
+        }
+
+        $normalized = ltrim($primary, '/');
+        if (Str::startsWith($normalized, 'api/product-images/')) {
+            return url('/' . $normalized);
+        }
+
+        return url('/api/product-images/' . $normalized);
+    }
+
+    private function setPayloadValue(array &$payload, string $path, mixed $value): void
+    {
+        $path = trim($path);
+        if ($path === '') {
+            return;
+        }
+
+        if (!str_contains($path, '.')) {
+            $payload[$path] = $value;
+            return;
+        }
+
+        $segments = array_values(array_filter(explode('.', $path), fn ($segment) => $segment !== ''));
+        if (empty($segments)) {
+            return;
+        }
+
+        $cursor = &$payload;
+        $lastIndex = count($segments) - 1;
+
+        foreach ($segments as $index => $segment) {
+            if ($index === $lastIndex) {
+                $cursor[$segment] = $value;
+                break;
+            }
+
+            if (!isset($cursor[$segment]) || !is_array($cursor[$segment])) {
+                $cursor[$segment] = [];
+            }
+
+            $cursor = &$cursor[$segment];
+        }
+    }
+
+    public function resolveCashcowPriceWithVat(Product $product): float
+    {
+        $price = $this->resolveCashcowBasePrice($product);
+        $vatRate = $this->getVatRate();
+        return round($price * (1 + $vatRate), 2);
+    }
+
+    private function resolveCashcowBasePrice(Product $product): float
+    {
+        $price = null;
+        $siteId = $this->resolveCashcowPriceSiteId();
+
+        if ($siteId !== null) {
+            $price = $this->resolvePluginSiteUnitPrice($product, $siteId);
+        }
+
+        if ($price === null) {
+            $price = is_numeric($product->price) ? (float) $product->price : 0.0;
+        }
+
+        if ($price < 0) {
+            $price = 0.0;
+        }
+
+        return round($price, 2);
+    }
+
+    private function resolveCashcowPriceSiteId(): ?int
+    {
+        if ($this->priceSiteResolved) {
+            return $this->priceSiteId;
+        }
+
+        $this->priceSiteResolved = true;
+
+        $configuredId = config('cashcow.price_site_id');
+        if (is_numeric($configuredId)) {
+            $siteId = (int) $configuredId;
+            if ($siteId > 0) {
+                $this->priceSiteId = $siteId;
+                return $this->priceSiteId;
+            }
+        }
+
+        $siteUrl = (string) (config('cashcow.price_site_url') ?? '');
+        if ($siteUrl === '') {
+            $siteUrl = (string) (config('cashcow.orders_site_url') ?? '');
+        }
+
+        $normalized = rtrim(trim($siteUrl), '/');
+        if ($normalized === '') {
+            return null;
+        }
+
+        $withTrailingSlash = $normalized . '/';
+
+        $site = MerchantSite::query()
+            ->where('site_url', $normalized)
+            ->orWhere('site_url', $withTrailingSlash)
+            ->first();
+
+        $this->priceSiteId = $site?->id;
+
+        return $this->priceSiteId;
+    }
+
+    private function getVatRate(): float
+    {
+        $setting = SystemSetting::where('key', 'shipping_pricing')->first();
+        $value = is_array($setting?->value) ? $setting->value : [];
+        $vat = $value['vat_rate'] ?? null;
+
+        if (is_numeric($vat)) {
+            $rate = (float) $vat;
+            if ($rate < 0) {
+                return 0.0;
+            }
+            if ($rate > 1) {
+                return 1.0;
+            }
+            return $rate;
+        }
+
+        return 0.17;
     }
 
     private function buildAttributesPayload(Product $product): array

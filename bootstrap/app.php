@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // $schedule->command('cashcow:sync-inventory')->everyTenMinutes();
         // $schedule->command('cashcow:push-inventory')->everyTenMinutes();
         $schedule->command('chita:sync-statuses')->everyTenMinutes();
-        $schedule->command('cashcow:sync-orders')->everyTenMinutes();
+        // $schedule->command('cashcow:sync-orders')->everyTenMinutes();
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {

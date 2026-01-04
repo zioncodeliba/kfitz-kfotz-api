@@ -163,6 +163,7 @@ class ProductController extends Controller
     public function update(Request $request, string $id)
     {
         $product = Product::findOrFail($id);
+        $cashcowSnapshotBefore = $this->buildCashcowSnapshot($product);
         $wasOutOfStock = $product->stock_quantity <= 0;
 
         $validated = $request->validate([
@@ -238,7 +239,8 @@ class ProductController extends Controller
 
         $product->load(['category', 'productVariations', 'shippingType']);
 
-        $cashcowFields = $this->resolveCashcowDeltaFields($request);
+        $cashcowSnapshotAfter = $this->buildCashcowSnapshot($product);
+        $cashcowFields = $this->resolveCashcowDeltaFields($cashcowSnapshotBefore, $cashcowSnapshotAfter);
         if (!empty($cashcowFields)) {
             try {
                 $this->pushProductDeltaToCashcow($product, $cashcowFields);
@@ -323,37 +325,172 @@ class ProductController extends Controller
     /**
      * @return array<int, string>
      */
-    protected function resolveCashcowDeltaFields(Request $request): array
+    protected function resolveCashcowDeltaFields(array $before, array $after): array
     {
         $fields = [];
 
-        if ($request->has('name')) {
+        if (($before['name'] ?? null) !== ($after['name'] ?? null)) {
             $fields[] = 'title';
         }
 
-        if ($request->has('description')) {
+        if (($before['description'] ?? null) !== ($after['description'] ?? null)) {
             $fields[] = 'short_description';
             $fields[] = 'long_description';
         }
 
-        if ($request->has('category_id')) {
+        if (($before['category_id'] ?? null) !== ($after['category_id'] ?? null)) {
             $fields[] = 'main_category_name';
         }
 
-        if ($request->has('stock_quantity')) {
+        if (($before['stock_quantity'] ?? null) !== ($after['stock_quantity'] ?? null)) {
             $fields[] = 'qty';
         }
 
-        if ($request->has('is_active')) {
+        if (($before['is_active'] ?? null) !== ($after['is_active'] ?? null)) {
             $fields[] = 'is_visible';
         }
 
-        if ($request->has('variations')) {
+        if (($before['variations'] ?? null) !== ($after['variations'] ?? null)) {
             $fields[] = 'attributes';
             $fields[] = 'attributes_matrix';
         }
 
+        if (($before['price'] ?? null) !== ($after['price'] ?? null)) {
+            $fields[] = 'price';
+        }
+
+        if (($before['image'] ?? null) !== ($after['image'] ?? null)) {
+            $fields[] = 'image';
+        }
+
         return array_values(array_unique($fields));
+    }
+
+    protected function buildCashcowSnapshot(Product $product): array
+    {
+        $images = is_array($product->images) ? $product->images : [];
+        $variations = $product->variations;
+
+        if (!is_array($variations)) {
+            $product->loadMissing('productVariations:id,product_id,sku,inventory,attributes');
+            $variations = $product->productVariations
+                ->map(function ($variation) {
+                    return [
+                        'sku' => $variation->sku,
+                        'inventory' => $variation->inventory,
+                        'attributes' => $variation->attributes ?? [],
+                    ];
+                })
+                ->toArray();
+        }
+
+        return [
+            'name' => $this->normalizeCashcowString($product->name),
+            'description' => $this->normalizeCashcowString($product->description),
+            'category_id' => $product->category_id !== null ? (int) $product->category_id : null,
+            'stock_quantity' => (int) $product->stock_quantity,
+            'is_active' => (bool) $product->is_active,
+            'price' => $this->cashcowProductPushService->resolveCashcowPriceWithVat($product),
+            'image' => $this->normalizePrimaryImage($images),
+            'variations' => $this->normalizeCashcowVariations($variations),
+        ];
+    }
+
+    protected function normalizeCashcowVariations(array $variations): array
+    {
+        $normalized = [];
+
+        foreach ($variations as $variation) {
+            if (is_object($variation)) {
+                $variation = (array) $variation;
+            }
+            if (!is_array($variation)) {
+                continue;
+            }
+
+            $sku = isset($variation['sku']) ? trim((string) $variation['sku']) : '';
+            if ($sku === '') {
+                continue;
+            }
+
+            $attributes = [];
+            if (isset($variation['attributes']) && is_array($variation['attributes'])) {
+                foreach ($variation['attributes'] as $key => $value) {
+                    $key = is_string($key) ? trim($key) : '';
+                    if ($key === '') {
+                        continue;
+                    }
+                    if (!is_scalar($value) && !(is_object($value) && method_exists($value, '__toString'))) {
+                        continue;
+                    }
+                    $stringValue = trim((string) $value);
+                    if ($stringValue === '') {
+                        continue;
+                    }
+                    $attributes[$key] = $stringValue;
+                }
+            }
+
+            if (empty($attributes)) {
+                continue;
+            }
+
+            ksort($attributes);
+
+            $inventory = 0;
+            if (isset($variation['inventory']) && is_numeric($variation['inventory'])) {
+                $inventory = (int) $variation['inventory'];
+            }
+
+            $normalized[] = [
+                'sku' => $sku,
+                'inventory' => $inventory,
+                'attributes' => $attributes,
+            ];
+        }
+
+        usort($normalized, function (array $left, array $right) {
+            $skuCompare = strcmp($left['sku'], $right['sku']);
+            if ($skuCompare !== 0) {
+                return $skuCompare;
+            }
+            $attrCompare = strcmp(json_encode($left['attributes']), json_encode($right['attributes']));
+            if ($attrCompare !== 0) {
+                return $attrCompare;
+            }
+            return $left['inventory'] <=> $right['inventory'];
+        });
+
+        return $normalized;
+    }
+
+    protected function normalizeCashcowString(?string $value): string
+    {
+        return is_string($value) ? trim($value) : '';
+    }
+
+    protected function normalizeCashcowNumber($value): ?float
+    {
+        if ($value === null || !is_numeric($value)) {
+            return null;
+        }
+
+        return round((float) $value, 2);
+    }
+
+    protected function normalizePrimaryImage(array $images): ?string
+    {
+        foreach ($images as $image) {
+            if (!is_string($image)) {
+                continue;
+            }
+            $trimmed = trim($image);
+            if ($trimmed !== '') {
+                return $trimmed;
+            }
+        }
+
+        return null;
     }
 
     protected function formatCashcowSkipReason(?string $reason): string
