@@ -30,7 +30,7 @@ class YpayInvoiceService
         $details = sprintf('Order %s', $order->order_number);
         $payload = [
             'docType' => 106,
-            'mail' => false,
+            'mail' => true,
             'details' => $details,
             'lang' => 'he',
             'currency' => 'ILS',
