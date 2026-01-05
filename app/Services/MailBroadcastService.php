@@ -33,8 +33,9 @@ class MailBroadcastService
             ] + ($recipient['context'] ?? []);
 
             $renderedSubject = $this->renderString($subjectTemplate, $payload);
-            $renderedHtml = $this->renderString($bodyTemplate, $payload);
-            $renderedText = strip_tags($renderedHtml);
+            $renderedBody = $this->renderString($bodyTemplate, $payload);
+            $renderedHtml = $this->formatBroadcastHtml($renderedBody);
+            $renderedText = $this->formatBroadcastText($renderedBody);
             $body = $this->inforuEmailService->buildBody($renderedHtml, $renderedText);
 
             $log = EmailLog::create([
@@ -100,6 +101,35 @@ class MailBroadcastService
         }
 
         return $results;
+    }
+
+    protected function formatBroadcastHtml(string $body): string
+    {
+        $formatted = $this->containsHtml($body)
+            ? $body
+            : nl2br(e($body));
+
+        return <<<HTML
+<div dir="rtl" style="direction:rtl;text-align:right;background-color:#f5f6f8;padding:24px 16px;">
+  <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;font-family:Arial, sans-serif;font-size:14px;line-height:1.7;color:#111827;direction:rtl;text-align:right;unicode-bidi:plaintext;">
+    {$formatted}
+  </div>
+</div>
+HTML;
+    }
+
+    protected function formatBroadcastText(string $body): string
+    {
+        if (!$this->containsHtml($body)) {
+            return $body;
+        }
+
+        return trim(strip_tags($body));
+    }
+
+    protected function containsHtml(string $value): bool
+    {
+        return preg_match('/<[^>]+>/', $value) === 1;
     }
 
     protected function renderString(string $template, array $payload): string

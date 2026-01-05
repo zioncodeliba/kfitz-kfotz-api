@@ -135,13 +135,13 @@ class OrderController extends Controller
     }
 
     /**
-     * Get open orders (pending/confirmed/processing).
+     * Get open orders (pending/confirmed/processing/lead).
      */
     public function openOrders(Request $request)
     {
         $user = $request->user();
         $query = Order::with(['items.product', 'user', 'merchant', 'agent', 'merchantCustomer', 'merchantSite'])
-            ->whereIn('status', ['pending', 'confirmed', 'processing']);
+            ->whereIn('status', ['pending', 'confirmed', 'processing', 'lead']);
 
         $agentMerchantIds = $user->hasRole('agent') ? $this->getAgentManagedMerchantUserIds($user) : null;
         $query = $this->applyOrderVisibilityScope($query, $user, $agentMerchantIds);
@@ -1099,7 +1099,7 @@ class OrderController extends Controller
         }
 
         $request->validate([
-            'status' => 'sometimes|in:pending,confirmed,processing,shipped,delivered,cancelled,refunded',
+            'status' => 'sometimes|in:pending,confirmed,processing,lead,shipped,delivered,cancelled,refunded',
             'payment_status' => 'sometimes|in:pending,paid,failed,refunded,cancelled,canceled',
             'tracking_number' => 'nullable|string',
             'shipping_company' => 'nullable|string',

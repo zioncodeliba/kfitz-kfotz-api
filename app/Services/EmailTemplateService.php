@@ -75,9 +75,17 @@ class EmailTemplateService
         }
 
         $renderedSubject = $this->renderString($template->subject, $payload);
-        $renderedHtml = $template->body_html ? $this->renderString($template->body_html, $payload) : null;
+        $rawHtml = $template->body_html ? $this->renderString($template->body_html, $payload) : null;
         $renderedText = $template->body_text ? $this->renderString($template->body_text, $payload) : null;
-        $body = $this->inforuEmailService->buildBody($renderedHtml, $renderedText);
+        $finalHtml = null;
+
+        if (is_string($rawHtml) && trim($rawHtml) !== '') {
+            $finalHtml = $this->wrapRtlHtml($rawHtml);
+        } elseif (is_string($renderedText) && trim($renderedText) !== '') {
+            $finalHtml = $this->wrapRtlHtml(nl2br(e($renderedText)));
+        }
+
+        $body = $this->inforuEmailService->buildBody($finalHtml, $renderedText);
         $sendRecipients = $this->flattenRecipients($resolvedRecipients);
 
         $log = EmailLog::create([
@@ -92,7 +100,7 @@ class EmailTemplateService
             'meta' => [
                 'recipients' => $resolvedRecipients,
                 'body' => [
-                    'html' => $renderedHtml,
+                    'html' => $finalHtml,
                     'text' => $renderedText,
                 ],
             ],
@@ -146,6 +154,17 @@ class EmailTemplateService
             'payload' => $payload,
             'meta' => null,
         ]);
+    }
+
+    protected function wrapRtlHtml(string $html): string
+    {
+        return <<<HTML
+<div dir="rtl" style="direction:rtl;text-align:right;">
+  <div style="direction:rtl;text-align:right;unicode-bidi:plaintext;">
+    {$html}
+  </div>
+</div>
+HTML;
     }
 
     protected function resolveRecipients(

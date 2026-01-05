@@ -305,6 +305,8 @@ class CashcowOrderSyncService
                 ])->saveQuietly();
             }
 
+            $productsToRefresh = [];
+
             foreach ($itemsContext['items'] as $item) {
                 $order->items()->create([
                     'product_id' => $item['product']->id,
@@ -315,6 +317,17 @@ class CashcowOrderSyncService
                     'total_price' => $item['total_price'],
                     'product_data' => $item['product_data'],
                 ]);
+
+                $item['product']->decrement('stock_quantity', $item['quantity']);
+                if ($item['variation'] && $item['variation']->inventory !== null) {
+                    $item['variation']->decrement('inventory', $item['quantity']);
+                }
+
+                $productsToRefresh[$item['product']->id] = $item['product'];
+            }
+
+            foreach ($productsToRefresh as $productToRefresh) {
+                $this->refreshProductVariationsSnapshot($productToRefresh);
             }
 
             // If Cashcow marked it as shipped (status 6), ensure we have an active shipment row.
@@ -490,6 +503,28 @@ class CashcowOrderSyncService
         ];
     }
 
+    protected function refreshProductVariationsSnapshot(Product $product): void
+    {
+        $collection = $product->productVariations()->orderBy('id')->get();
+
+        $snapshot = $collection->map(function (ProductVariation $variation) {
+            return [
+                'id' => $variation->id,
+                'sku' => $variation->sku,
+                'inventory' => (int) $variation->inventory,
+                'price' => $variation->price !== null ? (float) $variation->price : null,
+                'attributes' => $variation->attributes ?? [],
+                'image' => $variation->image,
+            ];
+        })->values()->toArray();
+
+        $product->forceFill([
+            'variations' => $snapshot,
+        ])->save();
+
+        $product->setRelation('productVariations', $collection);
+    }
+
     protected function syncMerchantCustomer(int $merchantUserId, array $payload): MerchantCustomer
     {
         $nameParts = [
@@ -576,9 +611,9 @@ class CashcowOrderSyncService
                 'label' => 'Awaiting bank transfer',
             ],
             2 => [
-                'status' => Order::STATUS_PROCESSING,
+                'status' => Order::STATUS_LEAD,
                 'payment_status' => 'pending',
-                'label' => 'Open without payment',
+                'label' => 'Lead',
             ],
             default => [
                 'status' => Order::STATUS_PROCESSING,

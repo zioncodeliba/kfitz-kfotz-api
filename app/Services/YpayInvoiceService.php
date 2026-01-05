@@ -236,9 +236,9 @@ class YpayInvoiceService
 
         $accessToken = (string) $tokenJson['access_token'];
 
-        // $documentUrl = $baseUrl . '/' . ltrim($documentGeneratorPath, '/');
+        $documentUrl = $baseUrl . '/' . ltrim($documentGeneratorPath, '/');
         // $documentUrl = 'https://webhook.site/07a96283-acdf-4bd1-aabb-f8995b0bae25';
-        $documentUrl = 'http://localhost:8001/api/ypay/test-pdf';
+        // $documentUrl = 'http://localhost:8001/api/ypay/test-pdf';
         $documentResponse = Http::timeout($timeout)
             ->retry(2, 250)
             ->acceptJson()
