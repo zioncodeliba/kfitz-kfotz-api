@@ -39,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         // $schedule->command('shipments:update-statuses')->everyFiveMinutes();
         // $schedule->command('cashcow:sync-inventory')->everyTenMinutes();
-        $schedule->command('cashcow:push-inventory')->everyTenMinutes();
+        // $schedule->command('cashcow:push-inventory')->everyTenMinutes();
         $schedule->command('chita:sync-statuses')->everyTenMinutes();
         $schedule->command('cashcow:sync-orders')->everyTenMinutes();
     })
