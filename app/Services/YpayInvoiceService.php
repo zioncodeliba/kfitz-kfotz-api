@@ -28,6 +28,31 @@ class YpayInvoiceService
         }
 
         $details = sprintf('Order %s', $order->order_number);
+        $shippingCost = max(0.0, (float) $order->shipping_cost);
+        $shippingLineTotal = $shippingCost > 0 ? min($shippingCost, $total) : 0.0;
+        $productsTotal = max(0.0, $total - $shippingLineTotal);
+        $items = [
+            [
+                'price' => $productsTotal,
+                'quantity' => 1.0,
+                'vatIncluded' => true,
+                'name' => $details,
+                'description' => sprintf(
+                    'Products subtotal: %.2f',
+                    (float) $order->subtotal
+                ),
+            ],
+        ];
+
+        if ($shippingLineTotal > 0) {
+            $items[] = [
+                'price' => $shippingLineTotal,
+                'quantity' => 1.0,
+                'vatIncluded' => true,
+                'name' => 'Shipping',
+                'description' => 'Shipping cost',
+            ];
+        }
         $payload = [
             'docType' => 106,
             'mail' => true,
@@ -35,20 +60,7 @@ class YpayInvoiceService
             'lang' => 'he',
             'currency' => 'ILS',
             'contact' => $this->buildMerchantContact($merchantUser, $details),
-            'items' => [
-                [
-                    'price' => $total,
-                    'quantity' => 1.0,
-                    'vatIncluded' => true,
-                    'name' => $details,
-                    'description' => sprintf(
-                        'Products: %.2f | VAT: %.2f | Shipping: %.2f',
-                        (float) $order->subtotal,
-                        (float) $order->tax,
-                        (float) $order->shipping_cost
-                    ),
-                ],
-            ],
+            'items' => $items,
             'methods' => [
                 [
                     'type' => 1,
