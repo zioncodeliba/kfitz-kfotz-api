@@ -121,7 +121,7 @@ class YpayInvoiceService
 
         $payload = [
             'docType' => 108,
-            'mail' => false,
+            'mail' => true,
             'details' => $details,
             'lang' => 'he',
             'currency' => $currency,
