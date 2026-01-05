@@ -2034,6 +2034,7 @@ class OrderController extends Controller
                 'carrier_service_type' => $order->carrier_service_type,
                 'weight' => $order->items->sum('weight') ?? 0,
                 'shipping_address' => $order->shipping_address,
+                'source_metadata' => $order->source_metadata,
                 'billing_address' => $order->billing_address,
                 'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
                 'items' => $order->items->map(function ($item) {
@@ -2236,6 +2237,7 @@ class OrderController extends Controller
                 'carrier_service_type' => $order->carrier_service_type,
                 'weight' => $order->items->sum('weight') ?? 0,
                 'shipping_address' => $order->shipping_address,
+                'source_metadata' => $order->source_metadata,
                 'billing_address' => $order->billing_address,
                 'carrier' => $order->carrier ? new ShippingCarrierResource($order->carrier) : null,
             ],
