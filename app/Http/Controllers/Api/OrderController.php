@@ -2391,6 +2391,14 @@ class OrderController extends Controller
             $destinationEmail = $destinationAddress['email']
                 ?? ($shippingAddress['email'] ?? $shippingAddress['contact_email'] ?? $order->user?->email ?? '');
 
+            $order->loadMissing('items');
+            $skuNotes = $order->items
+                ->pluck('product_sku')
+                ->filter(fn ($sku) => is_string($sku) && trim($sku) !== '')
+                ->map(fn ($sku) => trim($sku))
+                ->values()
+                ->implode(', ');
+
             $trackingNumber = $this->chitaShipmentService->createShipment([
                 'order_id' => $order->id,
                 'shipping_type' => $shippingTypeValue,
@@ -2401,7 +2409,7 @@ class OrderController extends Controller
                 'shipping_units' => $shippingUnitsPayload,
                 'reference' => $order->order_number ?? (string) $order->id,
                 'reference_secondary' => (string) $order->id,
-                'shipment_notes' => $request->input('shipment_notes'),
+                'order_skus' => $skuNotes,
                 'cod_payment' => $codPayment,
                 'cod_amount' => $codAmount,
                 'cod_method' => $codMethod,

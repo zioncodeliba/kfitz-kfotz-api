@@ -45,10 +45,10 @@ class ChitaShipmentService
         $consigneeName = $this->sanitizeString($destination['name'] ?? '');
         $city = $this->sanitizeString($destination['city'] ?? '');
         $street = $this->sanitizeString($destination['street'] ?? '');
-        // $phone = $this->sanitizeString($destination['phone'] ?? '');
-        // $phone2 = $this->sanitizeString($destination['secondary_phone'] ?? '');
-        $phone = '0504071205';
-        $phone2 = '0504071205';
+        $phone = $this->sanitizeString($destination['phone'] ?? '');
+        $phone2 = $this->sanitizeString($destination['secondary_phone'] ?? '');
+        // $phone = '0504071205';
+        // $phone2 = '0504071205';
         $email = $this->sanitizeString($destination['email'] ?? '');
 
         $reference = $this->sanitizeString($context['reference'] ?? '');
@@ -58,7 +58,7 @@ class ChitaShipmentService
         $cargoType = $this->buildCargoType($shippingUnits);
         $packageCount = $this->sumPackageCount($shippingUnits);
 
-        $notes = $this->sanitizeString($context['shipment_notes'] ?? '');
+        $notes = $this->sanitizeString($context['order_skus'] ?? '');
         $codPayment = (bool) ($context['cod_payment'] ?? false);
         $codAmount = $codPayment ? $this->formatNumber($context['cod_amount'] ?? null) : '';
         $codTypeCode = $this->resolveCodTypeCode($codPayment, $context['cod_method'] ?? null);
