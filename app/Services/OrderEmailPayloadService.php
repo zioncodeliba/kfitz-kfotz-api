@@ -72,6 +72,7 @@ class OrderEmailPayloadService
             ?? data_get($order->source_metadata, 'order.currency')
             ?? data_get($order->source_metadata, 'pricing_summary.currency')
             ?? 'ILS';
+        $itemsTable = $this->buildOrderItemsTableHtml($items, $siteUrl, $currency);
 
         return [
             'order' => [
@@ -91,6 +92,7 @@ class OrderEmailPayloadService
                 'shipping_method' => $order->shipping_method ?? $order->carrier_service_type,
                 'tracking_number' => $order->tracking_number,
                 'items_count' => $itemsCount,
+                'products_table' => $itemsTable,
             ],
             'customer' => [
                 'name' => $customerDetails['name'],
@@ -147,6 +149,95 @@ class OrderEmailPayloadService
                 ];
             })->toArray(),
         ];
+    }
+
+    private function buildOrderItemsTableHtml(iterable $items, ?string $siteUrl, string $currency): string
+    {
+        $rows = '';
+        $currencyLabel = e($currency);
+        $cellStyle = 'border:1px solid #e5e7eb;padding:8px;text-align:right;';
+        $headerStyle = $cellStyle . 'background-color:#f9fafb;font-weight:600;';
+
+        foreach ($items as $item) {
+            $name = trim((string) $item->product_name);
+            $sku = trim((string) $item->product_sku);
+            $displayName = $name !== '' ? $name : $sku;
+            if ($displayName === '') {
+                $displayName = 'Item';
+            }
+
+            $displayName = e($displayName);
+            $link = $this->resolveItemLink($item, $siteUrl);
+            if ($link !== null) {
+                $displayName = sprintf(
+                    '<a href="%s" style="color:#2563eb;text-decoration:none;">%s</a>',
+                    e($link),
+                    $displayName
+                );
+            }
+
+            $quantity = (int) $item->quantity;
+            $unitPrice = $this->formatMoney($item->unit_price);
+            $totalPrice = $this->formatMoney($item->total_price);
+
+            $rows .= sprintf(
+                '<tr><td style="%s">%s</td><td style="%s">%s</td><td style="%s">%d</td><td style="%s">%s %s</td><td style="%s">%s %s</td></tr>',
+                $cellStyle,
+                $displayName,
+                $cellStyle,
+                e($sku),
+                $cellStyle,
+                $quantity,
+                $cellStyle,
+                $unitPrice,
+                $currencyLabel,
+                $cellStyle,
+                $totalPrice,
+                $currencyLabel
+            );
+        }
+
+        if ($rows === '') {
+            return '';
+        }
+
+        return sprintf(
+            '<table dir="rtl" style="width:100%%;border-collapse:collapse;font-family:Arial, sans-serif;font-size:13px;line-height:1.5;">%s<tbody>%s</tbody></table>',
+            sprintf(
+                '<thead><tr><th style="%s">Product</th><th style="%s">SKU</th><th style="%s">Qty</th><th style="%s">Unit price</th><th style="%s">Total</th></tr></thead>',
+                $headerStyle,
+                $headerStyle,
+                $headerStyle,
+                $headerStyle,
+                $headerStyle
+            ),
+            $rows
+        );
+    }
+
+    private function resolveItemLink(object $item, ?string $siteUrl): ?string
+    {
+        $productData = is_array($item->product_data) ? $item->product_data : [];
+        $link = data_get($productData, 'link')
+            ?? data_get($productData, 'url')
+            ?? data_get($productData, 'product_url');
+
+        if (!$link && $siteUrl && $item->product_sku) {
+            $link = rtrim($siteUrl, '/') . '/products/' . rawurlencode($item->product_sku);
+        }
+
+        $link = is_string($link) ? trim($link) : '';
+
+        return $link !== '' ? $link : null;
+    }
+
+    private function formatMoney(mixed $value): string
+    {
+        if (!is_numeric($value)) {
+            return '0.00';
+        }
+
+        return number_format((float) $value, 2, '.', ',');
     }
 
     private function resolveOrderCustomerDetails(Order $order): array
