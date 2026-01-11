@@ -10,7 +10,10 @@ use Throwable;
 
 class EmailTemplateService
 {
-    public function __construct(private InforuEmailService $inforuEmailService)
+    public function __construct(
+        private InforuEmailService $inforuEmailService,
+        private InforuSmsService $inforuSmsService
+    )
     {
     }
 
@@ -87,6 +90,24 @@ class EmailTemplateService
 
         $body = $this->inforuEmailService->buildBody($finalHtml, $renderedText);
         $sendRecipients = $this->flattenRecipients($resolvedRecipients);
+        $smsConfig = $this->resolveSmsConfig($template, $payload);
+
+        $meta = [
+            'recipients' => $resolvedRecipients,
+            'body' => [
+                'html' => $finalHtml,
+                'text' => $renderedText,
+            ],
+        ];
+        if ($smsConfig['configured']) {
+            $meta['sms'] = [
+                'enabled' => $smsConfig['enabled'],
+                'message' => $smsConfig['message'],
+                'recipients' => $smsConfig['recipients'],
+                'sender' => $smsConfig['sender'] !== '' ? $smsConfig['sender'] : null,
+                'provider' => $smsConfig['provider'],
+            ];
+        }
 
         $log = EmailLog::create([
             'email_template_id' => $template->id,
@@ -97,13 +118,7 @@ class EmailTemplateService
             'subject' => $renderedSubject,
             'status' => 'queued',
             'payload' => $payload,
-            'meta' => [
-                'recipients' => $resolvedRecipients,
-                'body' => [
-                    'html' => $finalHtml,
-                    'text' => $renderedText,
-                ],
-            ],
+            'meta' => $meta,
         ]);
 
         try {
@@ -137,6 +152,8 @@ class EmailTemplateService
             ]);
         }
 
+        $this->sendSmsIfEnabled($log, $smsConfig, $eventKey);
+
         return $log->fresh();
     }
 
@@ -165,6 +182,152 @@ class EmailTemplateService
   </div>
 </div>
 HTML;
+    }
+
+    protected function resolveSmsConfig(EmailTemplate $template, array $payload): array
+    {
+        $metadata = $template->metadata;
+        if (!is_array($metadata)) {
+            return [
+                'configured' => false,
+                'enabled' => false,
+                'message' => '',
+                'recipients' => [],
+                'sender' => '',
+                'provider' => 'inforu',
+            ];
+        }
+
+        $sms = $metadata['sms'] ?? $metadata['sms_config'] ?? null;
+        if (!is_array($sms)) {
+            return [
+                'configured' => false,
+                'enabled' => false,
+                'message' => '',
+                'recipients' => [],
+                'sender' => '',
+                'provider' => 'inforu',
+            ];
+        }
+
+        $message = is_string($sms['message'] ?? null) ? trim($sms['message']) : '';
+        if ($message !== '') {
+            $message = $this->renderString($message, $payload);
+        }
+
+        $sender = is_string($sms['sender'] ?? null) ? trim($sms['sender']) : '';
+        $provider = is_string($sms['provider'] ?? null) ? trim($sms['provider']) : 'inforu';
+
+        return [
+            'configured' => true,
+            'enabled' => filter_var($sms['enabled'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'message' => $message,
+            'recipients' => $this->normalizeSmsRecipients($sms['recipients'] ?? []),
+            'sender' => $sender,
+            'provider' => $provider !== '' ? $provider : 'inforu',
+        ];
+    }
+
+    protected function normalizeSmsRecipients(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $items = is_string($value) ? explode(',', $value) : (array) $value;
+        $normalized = [];
+        $seen = [];
+
+        foreach ($items as $item) {
+            $phone = null;
+
+            if (is_string($item)) {
+                $phone = $item;
+            } elseif (is_array($item)) {
+                $phone = $item['phone'] ?? $item['Phone'] ?? null;
+            }
+
+            $phone = preg_replace('/\s+/', '', trim((string) $phone));
+            if ($phone === '') {
+                continue;
+            }
+
+            $key = strtolower($phone);
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $normalized[] = $phone;
+            $seen[$key] = true;
+        }
+
+        return $normalized;
+    }
+
+    protected function sendSmsIfEnabled(EmailLog $log, array $smsConfig, string $eventKey): void
+    {
+        if (!$smsConfig['configured'] || !$smsConfig['enabled']) {
+            return;
+        }
+
+        if ($smsConfig['message'] === '') {
+            $this->applySmsMeta($log, $smsConfig, 'skipped', 'SMS message is empty.');
+            Log::warning('SMS skipped: empty message', [
+                'event_key' => $eventKey,
+                'template_id' => $log->email_template_id,
+            ]);
+            return;
+        }
+
+        if (empty($smsConfig['recipients'])) {
+            $this->applySmsMeta($log, $smsConfig, 'skipped', 'SMS recipients are empty.');
+            Log::warning('SMS skipped: no recipients', [
+                'event_key' => $eventKey,
+                'template_id' => $log->email_template_id,
+            ]);
+            return;
+        }
+
+        try {
+            $result = $this->inforuSmsService->sendSms($smsConfig['recipients'], $smsConfig['message'], [
+                'sender' => $smsConfig['sender'],
+            ]);
+
+            $this->applySmsMeta($log, $smsConfig, 'sent', null, $result['response'] ?? $result);
+        } catch (Throwable $exception) {
+            Log::error('SMS send failed', [
+                'event_key' => $eventKey,
+                'template_id' => $log->email_template_id,
+                'error' => $exception->getMessage(),
+            ]);
+            $this->applySmsMeta($log, $smsConfig, 'failed', $exception->getMessage());
+        }
+    }
+
+    protected function applySmsMeta(
+        EmailLog $log,
+        array $smsConfig,
+        string $status,
+        ?string $errorMessage = null,
+        mixed $providerResponse = null
+    ): void
+    {
+        $meta = $log->meta ?? [];
+        $smsMeta = is_array($meta['sms'] ?? null) ? $meta['sms'] : [];
+
+        $meta['sms'] = array_merge($smsMeta, [
+            'enabled' => $smsConfig['enabled'],
+            'message' => $smsConfig['message'],
+            'recipients' => $smsConfig['recipients'],
+            'sender' => $smsConfig['sender'] !== '' ? $smsConfig['sender'] : null,
+            'provider' => $smsConfig['provider'],
+            'status' => $status,
+            'error_message' => $errorMessage,
+            'provider_response' => $providerResponse,
+            'sent_at' => $status === 'sent' ? now()->toDateTimeString() : null,
+        ]);
+
+        $log->update(['meta' => $meta]);
     }
 
     protected function resolveRecipients(
