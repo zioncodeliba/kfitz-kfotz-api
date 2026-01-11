@@ -685,7 +685,8 @@ class CashcowOrderSyncService
         }
 
         try {
-            return Carbon::parse($date);
+            $timezone = (string) config('cashcow.timezone', 'Asia/Jerusalem');
+            return Carbon::parse($date, $timezone)->utc();
         } catch (\Throwable) {
             return null;
         }

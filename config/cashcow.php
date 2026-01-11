@@ -11,4 +11,5 @@ return [
     'price_site_url' => env('CASHCOW_PRICE_SITE_URL'),
     'price_field' => env('CASHCOW_PRICE_FIELD', 'prices.sell_price'),
     'image_field' => env('CASHCOW_IMAGE_FIELD', 'image_url'),
+    'timezone' => env('CASHCOW_TIMEZONE', 'Asia/Jerusalem'),
 ];
