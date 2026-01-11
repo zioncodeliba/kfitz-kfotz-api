@@ -13,7 +13,7 @@ class EmailLogController extends Controller
 
     public function index(Request $request)
     {
-        $logs = EmailLog::query()
+        $query = EmailLog::query()
             ->with([
                 'template:id,event_key,name,email_list_id',
                 'template.emailList:id,name',
@@ -31,8 +31,13 @@ class EmailLogController extends Controller
                         ->orWhere('subject', 'like', "%{$search}%");
                 });
             })
-            ->orderByDesc('created_at')
-            ->paginate($request->integer('per_page', 20));
+            ->orderByDesc('created_at');
+
+        if ($request->boolean('all')) {
+            return $this->successResponse($query->get());
+        }
+
+        $logs = $query->paginate($request->integer('per_page', 20));
 
         return $this->successResponse($logs);
     }
