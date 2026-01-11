@@ -2401,7 +2401,7 @@ class OrderController extends Controller
 
                     $quantity = (int) $item->quantity;
 
-                    return sprintf('%s-(X %d)', $sku, $quantity);
+                    return sprintf('%s-%d', $sku, $quantity);
                 })
                 ->filter(fn ($note) => is_string($note) && $note !== '')
                 ->values()
