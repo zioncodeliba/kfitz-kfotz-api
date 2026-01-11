@@ -407,12 +407,21 @@ class CashcowOrderSyncService
         try {
             $payload = $this->orderEmailPayloadService->build($order);
             $this->emailTemplateService->send(
-                $eventKey,
+                'order.created',
                 $payload,
                 [],
                 includeMailingList: true,
                 ignoreOverrideRecipients: true
             );
+            if ($eventKey !== 'order.created') {
+                $this->emailTemplateService->send(
+                    $eventKey,
+                    $payload,
+                    [],
+                    includeMailingList: true,
+                    ignoreOverrideRecipients: true
+                );
+            }
         } catch (\Throwable $exception) {
             Log::warning('Failed to send Cashcow order notification', [
                 'order_id' => $order->id,
