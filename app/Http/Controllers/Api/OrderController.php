@@ -2393,9 +2393,17 @@ class OrderController extends Controller
 
             $order->loadMissing('items');
             $skuNotes = $order->items
-                ->pluck('product_sku')
-                ->filter(fn ($sku) => is_string($sku) && trim($sku) !== '')
-                ->map(fn ($sku) => trim($sku))
+                ->map(function ($item) {
+                    $sku = is_string($item->product_sku) ? trim($item->product_sku) : '';
+                    if ($sku === '') {
+                        return null;
+                    }
+
+                    $quantity = (int) $item->quantity;
+
+                    return sprintf('%s-(X %d)', $sku, $quantity);
+                })
+                ->filter(fn ($note) => is_string($note) && $note !== '')
                 ->values()
                 ->implode(', ');
 

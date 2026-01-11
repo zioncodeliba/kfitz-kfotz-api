@@ -13,7 +13,8 @@ class CatalogImportCsvSeeder extends Seeder
     private string $categoriesPath = 'import/categories.csv';
     private string $productsPath = 'import/products.csv';
     private int $chunkSize = 50;
-    private bool $truncateBeforeImport = true;
+    private bool $truncateBeforeImport = false;
+    private bool $logEachProduct = true;
     private array $tempFiles = [];
 
     public function run(): void
@@ -48,7 +49,9 @@ class CatalogImportCsvSeeder extends Seeder
             $productStats = $this->importProducts($productsFilePrepared, $categoryLookup, $sortOrder);
 
             $this->command?->info("Categories imported: {$categoryStats['main']} mains, {$categoryStats['sub']} subs (total {$categoryStats['total']})");
-            $this->command?->info("Products processed: {$productStats['processed']}, skipped: {$productStats['skipped']}");
+            $this->command?->info(
+                "Products processed: {$productStats['processed']}, inserted: {$productStats['inserted']}, skipped: {$productStats['skipped']}, existing: {$productStats['skipped_existing']}, duplicates: {$productStats['skipped_duplicate']}"
+            );
 
             if (!empty($productStats['missing_categories'])) {
                 $missing = implode(', ', $productStats['missing_categories']);
@@ -140,8 +143,12 @@ class CatalogImportCsvSeeder extends Seeder
         $batch = [];
         $processed = 0;
         $skipped = 0;
+        $inserted = 0;
+        $skippedExisting = 0;
+        $skippedDuplicate = 0;
         $missingCategories = [];
         $sortOrder = $startingSortOrder;
+        $seenSkus = [];
 
         foreach ($file as $row) {
             if ($row === null || $row === false) {
@@ -163,6 +170,7 @@ class CatalogImportCsvSeeder extends Seeder
 
             if ($data === false) {
                 $skipped++;
+                $this->logProductAction('Skipped row: header mismatch');
                 continue;
             }
 
@@ -171,8 +179,17 @@ class CatalogImportCsvSeeder extends Seeder
             $sku = trim((string) ($this->value($data, 'sku') ?? ''));
             if ($sku === '') {
                 $skipped++;
+                $this->logProductAction('Skipped row: missing SKU');
                 continue;
             }
+
+            if (isset($seenSkus[$sku])) {
+                $skippedDuplicate++;
+                $this->logProductAction("Skipped duplicate SKU in CSV: {$sku}");
+                continue;
+            }
+
+            $seenSkus[$sku] = true;
 
             $categoryName = trim((string) ($this->value($data, 'categoryname') ?? ''));
             $categoryId = $categoryName !== ''
@@ -193,6 +210,7 @@ class CatalogImportCsvSeeder extends Seeder
             if ($categoryId === null) {
                 $missingCategories['(empty)'] = '(empty)';
                 $skipped++;
+                $this->logProductAction("Skipped SKU {$sku}: missing category");
                 continue;
             }
 
@@ -220,18 +238,25 @@ class CatalogImportCsvSeeder extends Seeder
             $processed++;
 
             if (count($batch) >= $this->chunkSize) {
-                $this->upsertProducts($batch);
+                $batchStats = $this->insertNewProducts($batch);
+                $inserted += $batchStats['inserted'];
+                $skippedExisting += $batchStats['skipped_existing'];
                 $batch = [];
             }
         }
 
         if (!empty($batch)) {
-            $this->upsertProducts($batch);
+            $batchStats = $this->insertNewProducts($batch);
+            $inserted += $batchStats['inserted'];
+            $skippedExisting += $batchStats['skipped_existing'];
         }
 
         return [
             'processed' => $processed,
+            'inserted' => $inserted,
             'skipped' => $skipped,
+            'skipped_existing' => $skippedExisting,
+            'skipped_duplicate' => $skippedDuplicate,
             'missing_categories' => array_values($missingCategories),
         ];
     }
@@ -415,7 +440,7 @@ class CatalogImportCsvSeeder extends Seeder
         return $path;
     }
 
-    private function upsertProducts(array $batch): void
+    private function insertNewProducts(array $batch): array
     {
         $normalizedBatch = array_map(function (array $item) {
             $item['images'] = $item['images'] !== null ? json_encode($item['images']) : null;
@@ -424,27 +449,59 @@ class CatalogImportCsvSeeder extends Seeder
             return $item;
         }, $batch);
 
-        Product::upsert(
-            $normalizedBatch,
-            ['sku'],
-            [
-                'name',
-                'description',
-                'price',
-                'sale_price',
-                'cost_price',
-                'shipping_price',
-                'stock_quantity',
-                'min_stock_alert',
-                'category_id',
-                'is_active',
-                'is_featured',
-                'images',
-                'variations',
-                'weight',
-                'dimensions',
-                'updated_at',
-            ]
-        );
+        $skus = array_values(array_unique(array_map(
+            static fn (array $item) => $item['sku'],
+            $normalizedBatch
+        )));
+
+        if ($skus === []) {
+            return [
+                'inserted' => 0,
+                'skipped_existing' => 0,
+            ];
+        }
+
+        $existingSkus = Product::whereIn('sku', $skus)
+            ->pluck('sku')
+            ->all();
+
+        $existingLookup = array_fill_keys($existingSkus, true);
+        $newBatch = [];
+        $insertedSkus = [];
+        $skippedExistingSkus = [];
+
+        foreach ($normalizedBatch as $item) {
+            if (isset($existingLookup[$item['sku']])) {
+                $skippedExistingSkus[] = $item['sku'];
+                continue;
+            }
+
+            $newBatch[] = $item;
+            $insertedSkus[] = $item['sku'];
+        }
+
+        if (!empty($newBatch)) {
+            Product::insert($newBatch);
+        }
+
+        foreach ($insertedSkus as $sku) {
+            $this->logProductAction("Created product: {$sku}");
+        }
+
+        foreach ($skippedExistingSkus as $sku) {
+            $this->logProductAction("Skipped existing product: {$sku}");
+        }
+
+        return [
+            'inserted' => count($insertedSkus),
+            'skipped_existing' => count($skippedExistingSkus),
+        ];
+    }
+
+    private function logProductAction(string $message): void
+    {
+        if ($this->command && $this->logEachProduct) {
+            $this->command->line($message);
+        }
     }
 }
