@@ -393,9 +393,11 @@ class OrderAndShipmentSeeder extends Seeder
                     ]
                 );
 
-                $order->items()->delete();
                 foreach ($itemsPayload as $itemPayload) {
-                    $order->items()->create($itemPayload);
+                    $order->items()->updateOrCreate(
+                        ['product_id' => $itemPayload['product_id']],
+                        $itemPayload
+                    );
                 }
 
                 $order->timestamps = false;
@@ -505,15 +507,6 @@ class OrderAndShipmentSeeder extends Seeder
                     $order->shipping_company = $carrier->name;
                     $order->carrier_id = $carrier->id;
                     $order->carrier_service_type = $shipmentConfig['service_type'];
-                    $order->timestamps = false;
-                    $order->save();
-                    $order->timestamps = true;
-                } else {
-                    Shipment::where('order_id', $order->id)->delete();
-                    $order->tracking_number = null;
-                    $order->shipping_company = null;
-                    $order->carrier_id = null;
-                    $order->carrier_service_type = null;
                     $order->timestamps = false;
                     $order->save();
                     $order->timestamps = true;

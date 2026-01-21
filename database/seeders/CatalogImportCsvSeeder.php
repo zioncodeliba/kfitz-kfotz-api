@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Schema;
 use SplFileObject;
 
 class CatalogImportCsvSeeder extends Seeder
@@ -13,7 +12,6 @@ class CatalogImportCsvSeeder extends Seeder
     private string $categoriesPath = 'import/categories.csv';
     private string $productsPath = 'import/products.csv';
     private int $chunkSize = 50;
-    private bool $truncateBeforeImport = false;
     private bool $logEachProduct = true;
     private array $tempFiles = [];
 
@@ -37,13 +35,6 @@ class CatalogImportCsvSeeder extends Seeder
         try {
             $categoriesFilePrepared = $this->prepareFile($categoriesFile);
             $productsFilePrepared = $this->prepareFile($productsFile);
-
-            if ($this->truncateBeforeImport) {
-                Schema::disableForeignKeyConstraints();
-                Product::truncate();
-                Category::truncate();
-                Schema::enableForeignKeyConstraints();
-            }
 
             [$categoryLookup, $categoryStats, $sortOrder] = $this->importCategories($categoriesFilePrepared);
             $productStats = $this->importProducts($productsFilePrepared, $categoryLookup, $sortOrder);
