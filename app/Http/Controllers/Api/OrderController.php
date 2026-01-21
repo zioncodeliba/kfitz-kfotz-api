@@ -268,6 +268,13 @@ class OrderController extends Controller
 
                 $product = Product::with(['productVariations', 'category'])->findOrFail($productId);
 
+                if ($merchantId && !$this->isProductAvailableForMerchant($product, $merchantId)) {
+                    return $this->errorResponse(sprintf(
+                        'Product %s is not available for this merchant.',
+                        $product->name
+                    ), 422);
+                }
+
                 if ($product->stock_quantity < $quantity) {
                     return $this->errorResponse("Insufficient stock for product: {$product->name}", 400);
                 }
@@ -614,6 +621,13 @@ class OrderController extends Controller
                 continue;
             }
 
+            if (array_key_exists('is_enabled', $entry)) {
+                $isEnabled = filter_var($entry['is_enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($isEnabled === false) {
+                    return null;
+                }
+            }
+
             $rawPrice = $entry['price'] ?? null;
             if (is_numeric($rawPrice)) {
                 $price = (float) $rawPrice;
@@ -622,6 +636,44 @@ class OrderController extends Controller
         }
 
         return null;
+    }
+
+    protected function isProductAvailableForMerchant(Product $product, ?int $merchantUserId): bool
+    {
+        if (!$merchantUserId) {
+            return true;
+        }
+
+        $prices = $product->merchant_prices;
+        if (!is_array($prices) || empty($prices)) {
+            return true;
+        }
+
+        foreach ($prices as $entry) {
+            if (is_object($entry)) {
+                $entry = (array) $entry;
+            }
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $entryMerchantId = $entry['merchant_id'] ?? null;
+            if ($entryMerchantId === null) {
+                continue;
+            }
+
+            if ((int) $entryMerchantId !== $merchantUserId) {
+                continue;
+            }
+
+            if (!array_key_exists('is_enabled', $entry)) {
+                return true;
+            }
+
+            return filter_var($entry['is_enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) !== false;
+        }
+
+        return true;
     }
 
     protected function determineUnitPrice(

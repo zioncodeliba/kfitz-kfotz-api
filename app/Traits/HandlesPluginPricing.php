@@ -117,6 +117,13 @@ trait HandlesPluginPricing
                 continue;
             }
 
+            if (array_key_exists('is_enabled', $entry)) {
+                $isEnabled = filter_var($entry['is_enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($isEnabled === false) {
+                    return null;
+                }
+            }
+
             $rawPrice = $entry['price'] ?? null;
             if (is_numeric($rawPrice)) {
                 $price = (float) $rawPrice;

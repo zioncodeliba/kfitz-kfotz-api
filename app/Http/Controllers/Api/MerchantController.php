@@ -932,7 +932,7 @@ class MerchantController extends Controller
             ->where('restocked_initial_stock', '>', 0)
             ->where('stock_quantity', '>', 0)
             ->whereRaw(
-                '(restocked_initial_stock - stock_quantity) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
+                '(GREATEST(CAST(restocked_initial_stock AS SIGNED) - CAST(stock_quantity AS SIGNED), 0)) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
             )
             ->count();
     }

@@ -106,6 +106,7 @@ class ProductController extends Controller
             'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
             'merchant_prices.*.price' => 'required|numeric|min:0',
             'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
+            'merchant_prices.*.is_enabled' => 'nullable|boolean',
             'plugin_site_prices' => 'nullable|array',
             'plugin_site_prices.*.site_id' => 'required|integer|exists:merchant_sites,id',
             'plugin_site_prices.*.price' => 'required|numeric|min:0',
@@ -191,6 +192,7 @@ class ProductController extends Controller
             'merchant_prices.*.merchant_id' => 'required|integer|exists:users,id',
             'merchant_prices.*.price' => 'required|numeric|min:0',
             'merchant_prices.*.merchant_name' => 'nullable|string|max:255',
+            'merchant_prices.*.is_enabled' => 'nullable|boolean',
             'plugin_site_prices' => 'nullable|array',
             'plugin_site_prices.*.site_id' => 'required|integer|exists:merchant_sites,id',
             'plugin_site_prices.*.price' => 'required|numeric|min:0',
@@ -596,10 +598,15 @@ class ProductController extends Controller
                 $merchantName = $namesByUserId[$merchantId];
             }
 
+            $isEnabled = array_key_exists('is_enabled', $row)
+                ? filter_var($row['is_enabled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                : true;
+
             $normalized[$merchantId] = [
                 'merchant_id' => $merchantId,
                 'price' => round($price, 2),
                 'merchant_name' => $merchantName,
+                'is_enabled' => $isEnabled !== false,
             ];
         }
 
@@ -949,7 +956,7 @@ class ProductController extends Controller
             ->where('restocked_initial_stock', '>', 0)
             ->where('stock_quantity', '>', 0)
             ->whereRaw(
-                '(restocked_initial_stock - stock_quantity) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
+                '(GREATEST(CAST(restocked_initial_stock AS SIGNED) - CAST(stock_quantity AS SIGNED), 0)) < (CASE WHEN restocked_initial_stock < 10 THEN 1 ELSE CEIL(restocked_initial_stock * 0.1) END)'
             )
             ->orderByDesc('restocked_at')
             ->get();
