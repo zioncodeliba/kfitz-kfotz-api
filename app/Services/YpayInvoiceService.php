@@ -30,19 +30,41 @@ class YpayInvoiceService
         $details = sprintf('Order %s', $order->order_number);
         $shippingCost = max(0.0, (float) $order->shipping_cost);
         $shippingLineTotal = $shippingCost > 0 ? min($shippingCost, $total) : 0.0;
-        $productsTotal = max(0.0, $total - $shippingLineTotal);
-        $items = [
-            [
-                'price' => $productsTotal,
-                'quantity' => 1.0,
-                'vatIncluded' => true,
-                'name' => $details,
-                'description' => sprintf(
-                    'Products subtotal: %.2f',
-                    (float) $order->subtotal
-                ),
-            ],
-        ];
+        $items = $this->buildOrderItemLines($order, $details);
+
+        if (empty($items)) {
+            $productsTotal = max(0.0, $total - $shippingLineTotal);
+            $items = [
+                [
+                    'price' => $productsTotal,
+                    'quantity' => 1.0,
+                    'vatIncluded' => true,
+                    'name' => $details,
+                    'description' => sprintf(
+                        'Products subtotal: %.2f',
+                        (float) $order->subtotal
+                    ),
+                ],
+            ];
+        }
+
+        $itemsTotal = array_reduce(
+            $items,
+            static fn (float $carry, array $item): float => $carry + ((float) $item['price'] * (float) $item['quantity']),
+            0.0
+        );
+        $delta = round($total - ($itemsTotal + $shippingLineTotal), 2);
+        if (abs($delta) >= 0.01 && !empty($items)) {
+            $lastIndex = array_key_last($items);
+            $quantity = (float) ($items[$lastIndex]['quantity'] ?? 1.0);
+            if (!is_finite($quantity) || $quantity <= 0) {
+                $quantity = 1.0;
+            }
+            $adjustedPrice = round((float) $items[$lastIndex]['price'] + ($delta / $quantity), 2);
+            if ($adjustedPrice >= 0) {
+                $items[$lastIndex]['price'] = $adjustedPrice;
+            }
+        }
 
         if ($shippingLineTotal > 0) {
             $items[] = [
@@ -104,6 +126,55 @@ class YpayInvoiceService
         // ];
 
         return $this->sendDocument($payload);
+    }
+
+    private function buildOrderItemLines(Order $order, string $details): array
+    {
+        $items = [];
+
+        foreach ($order->items as $item) {
+            $quantity = $this->toFloat($item->quantity);
+            if ($quantity === null || $quantity <= 0) {
+                continue;
+            }
+
+            $unitPrice = $this->toFloat($item->unit_price);
+            if ($unitPrice === null || $unitPrice < 0) {
+                $totalPrice = $this->toFloat($item->total_price);
+                if ($totalPrice !== null && $totalPrice >= 0) {
+                    $unitPrice = $totalPrice / max(1.0, $quantity);
+                }
+            }
+
+            if ($unitPrice === null) {
+                $unitPrice = 0.0;
+            }
+
+            $sku = is_string($item->product_sku) ? trim($item->product_sku) : '';
+            $productName = is_string($item->product_name) ? trim($item->product_name) : '';
+            $name = $sku !== '' ? $sku : ($productName !== '' ? $productName : $details);
+            $description = $productName !== '' ? $productName : null;
+
+            $items[] = array_filter([
+                'price' => round($unitPrice, 2),
+                'quantity' => (float) $quantity,
+                'vatIncluded' => true,
+                'name' => $name,
+                'description' => $description,
+            ], static fn ($value) => $value !== null);
+        }
+
+        return $items;
+    }
+
+    private function toFloat($value): ?float
+    {
+        if (is_numeric($value)) {
+            $floatValue = (float) $value;
+            return is_finite($floatValue) ? $floatValue : null;
+        }
+
+        return null;
     }
 
     /**

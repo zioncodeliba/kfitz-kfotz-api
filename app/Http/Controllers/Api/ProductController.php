@@ -166,6 +166,7 @@ class ProductController extends Controller
         $product = Product::findOrFail($id);
         $cashcowSnapshotBefore = $this->buildCashcowSnapshot($product);
         $wasOutOfStock = $product->stock_quantity <= 0;
+        $wasInStock = $product->stock_quantity > 0;
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -265,6 +266,9 @@ class ProductController extends Controller
         if ($wasOutOfStock && $product->stock_quantity > 0) {
             $this->notifyProductBackInStock($product);
         }
+        if ($wasInStock && $product->stock_quantity <= 0) {
+            $this->notifyProductOutOfStock($product);
+        }
 
         return $this->successResponse($product, 'Product updated successfully');
     }
@@ -277,6 +281,20 @@ class ProductController extends Controller
             $this->emailTemplateService->send('product.back_in_stock', $payload);
         } catch (\Throwable $exception) {
             Log::warning('Failed to send product back in stock notification', [
+                'product_id' => $product->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function notifyProductOutOfStock(Product $product): void
+    {
+        try {
+            $product->loadMissing('category');
+            $payload = $this->buildProductOutOfStockPayload($product);
+            $this->emailTemplateService->send('product.out_of_stock', $payload);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send product out of stock notification', [
                 'product_id' => $product->id,
                 'error' => $exception->getMessage(),
             ]);
@@ -510,6 +528,7 @@ class ProductController extends Controller
     protected function buildProductBackInStockPayload(Product $product): array
     {
         return [
+            'recipient' => $this->resolveStockNotificationRecipient(),
             'product' => [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -522,6 +541,31 @@ class ProductController extends Controller
                 'name' => optional($product->category)->name,
             ],
         ];
+    }
+
+    protected function buildProductOutOfStockPayload(Product $product): array
+    {
+        return [
+            'recipient' => $this->resolveStockNotificationRecipient(),
+            'product' => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'stock_quantity' => $product->stock_quantity,
+                'min_stock_alert' => $product->min_stock_alert,
+                'price' => $product->price,
+            ],
+            'category' => [
+                'name' => optional($product->category)->name,
+            ],
+        ];
+    }
+
+    protected function resolveStockNotificationRecipient(): array
+    {
+        $email = config('cashcow.notify_email') ?: config('mail.from.address');
+
+        return $email ? ['email' => $email] : [];
     }
 
     /**

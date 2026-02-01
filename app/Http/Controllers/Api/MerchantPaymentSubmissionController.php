@@ -6,13 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Merchant;
 use App\Models\MerchantPaymentSubmission;
 use App\Models\User;
+use App\Services\EmailTemplateService;
+use App\Services\MerchantPaymentSubmissionEmailPayloadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class MerchantPaymentSubmissionController extends Controller
 {
-    public function store(Request $request): JsonResponse
+    public function store(
+        Request $request,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentSubmissionEmailPayloadService $payloadService
+    ): JsonResponse
     {
         $user = $request->user();
         if (!$user || $user->role !== 'merchant') {
@@ -36,6 +43,17 @@ class MerchantPaymentSubmissionController extends Controller
             'note' => $validated['note'] ?? null,
             'submitted_at' => now(),
         ]);
+
+        $this->sendPaymentSubmissionEvent(
+            $submission,
+            $emailTemplateService,
+            $payloadService,
+            $user,
+            [
+                'source' => 'merchant_portal',
+                'method' => 'bank_transfer',
+            ]
+        );
 
         return response()->json([
             'message' => 'הבקשה נרשמה וממתינה לאישור אדמין.',
@@ -81,7 +99,12 @@ class MerchantPaymentSubmissionController extends Controller
         ]);
     }
 
-    public function adminStore(Request $request, int $merchantId): JsonResponse
+    public function adminStore(
+        Request $request,
+        int $merchantId,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentSubmissionEmailPayloadService $payloadService
+    ): JsonResponse
     {
         $admin = $request->user();
         if (!$admin || $admin->role !== 'admin') {
@@ -110,6 +133,17 @@ class MerchantPaymentSubmissionController extends Controller
             'note' => $validated['note'] ?? null,
             'submitted_at' => now(),
         ]);
+
+        $this->sendPaymentSubmissionEvent(
+            $submission,
+            $emailTemplateService,
+            $payloadService,
+            $admin,
+            [
+                'source' => 'admin_portal',
+                'method' => 'bank_transfer',
+            ]
+        );
 
         return response()->json([
             'message' => 'היתרה נוספה וממתינה לאישור.',
@@ -142,5 +176,29 @@ class MerchantPaymentSubmissionController extends Controller
         }
 
         return [null, null];
+    }
+
+    private function sendPaymentSubmissionEvent(
+        MerchantPaymentSubmission $submission,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentSubmissionEmailPayloadService $payloadService,
+        ?User $initiator,
+        array $context = []
+    ): void {
+        try {
+            $payload = $payloadService->build($submission, $context, $initiator);
+            $emailTemplateService->send(
+                'merchant.payment.bank_transfer.requested',
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send merchant payment submission event', [
+                'submission_id' => $submission->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

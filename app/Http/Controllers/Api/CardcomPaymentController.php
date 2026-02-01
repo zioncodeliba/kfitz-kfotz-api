@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\MerchantPayment;
+use App\Services\EmailTemplateService;
+use App\Services\MerchantPaymentEmailPayloadService;
 use App\Services\YpayInvoiceService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -14,7 +16,12 @@ use Throwable;
 
 class CardcomPaymentController extends Controller
 {
-    public function notify(Request $request, YpayInvoiceService $ypayInvoiceService)
+    public function notify(
+        Request $request,
+        YpayInvoiceService $ypayInvoiceService,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentEmailPayloadService $paymentPayloadService
+    )
     {
         $logger = Log::channel('cardcom_notify');
         $payload = $request->all();
@@ -145,6 +152,19 @@ class CardcomPaymentController extends Controller
             }
         }
 
+        if ($payment instanceof MerchantPayment && $payment->wasRecentlyCreated) {
+            $this->sendPaymentReceivedEvent(
+                $payment,
+                $emailTemplateService,
+                $paymentPayloadService,
+                [
+                    'source' => 'cardcom',
+                    'month' => $monthKey,
+                    'outstanding_before' => $outstanding,
+                ]
+            );
+        }
+
         return response()->json([
             'message' => 'Orders marked as paid',
             'merchant_id' => $merchantId,
@@ -178,5 +198,28 @@ class CardcomPaymentController extends Controller
         // Fallback: not parseable
         Log::channel('cardcom_notify')->warning('Cardcom ReturnData not parseable', ['ReturnData' => $raw]);
         return [];
+    }
+
+    private function sendPaymentReceivedEvent(
+        MerchantPayment $payment,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentEmailPayloadService $paymentPayloadService,
+        array $context = []
+    ): void {
+        try {
+            $payload = $paymentPayloadService->build($payment, $context);
+            $emailTemplateService->send(
+                'merchant.payment.received',
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
+        } catch (Throwable $exception) {
+            Log::warning('Failed to send merchant payment received event', [
+                'payment_id' => $payment->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

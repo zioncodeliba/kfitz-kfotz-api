@@ -9,9 +9,12 @@ use App\Models\MerchantPaymentOrder;
 use App\Models\MerchantPaymentSubmission;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\EmailTemplateService;
+use App\Services\MerchantPaymentEmailPayloadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
@@ -69,7 +72,12 @@ class MerchantPaymentController extends Controller
         ]);
     }
 
-    public function store(Request $request, int $merchant): JsonResponse
+    public function store(
+        Request $request,
+        int $merchant,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentEmailPayloadService $paymentPayloadService
+    ): JsonResponse
     {
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -187,13 +195,30 @@ class MerchantPaymentController extends Controller
             ];
         });
 
+        $payment = $result['payment'] ?? null;
+        if ($payment instanceof MerchantPayment) {
+            $this->sendPaymentReceivedEvent(
+                $payment,
+                $emailTemplateService,
+                $paymentPayloadService,
+                [
+                    'source' => 'admin_manual',
+                ]
+            );
+        }
+
         return response()->json([
             'message' => 'התשלום נשמר והוקצה להזמנות.',
             'data' => $result,
         ], 201);
     }
 
-    public function approveFromSubmissions(Request $request, int $merchant): JsonResponse
+    public function approveFromSubmissions(
+        Request $request,
+        int $merchant,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentEmailPayloadService $paymentPayloadService
+    ): JsonResponse
     {
         $validated = $request->validate([
             'order_ids' => ['nullable', 'array'],
@@ -495,6 +520,19 @@ class MerchantPaymentController extends Controller
             ];
         });
 
+        $payment = $result['payment'] ?? null;
+        if ($payment instanceof MerchantPayment) {
+            $this->sendPaymentReceivedEvent(
+                $payment,
+                $emailTemplateService,
+                $paymentPayloadService,
+                [
+                    'source' => 'bank_transfer',
+                    'approved_submissions' => $result['approved_submissions'] ?? [],
+                ]
+            );
+        }
+
         return response()->json([
             'message' => 'התשלום אושר והוקצה להזמנות.',
             'data' => $result,
@@ -526,5 +564,28 @@ class MerchantPaymentController extends Controller
         }
 
         return [null, null];
+    }
+
+    private function sendPaymentReceivedEvent(
+        MerchantPayment $payment,
+        EmailTemplateService $emailTemplateService,
+        MerchantPaymentEmailPayloadService $paymentPayloadService,
+        array $context = []
+    ): void {
+        try {
+            $payload = $paymentPayloadService->build($payment, $context);
+            $emailTemplateService->send(
+                'merchant.payment.received',
+                $payload,
+                [],
+                includeMailingList: true,
+                ignoreOverrideRecipients: true
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to send merchant payment received event', [
+                'payment_id' => $payment->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }
