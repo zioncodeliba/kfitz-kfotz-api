@@ -1204,6 +1204,17 @@ class OrderController extends Controller
             }
         }
 
+        if ($request->has('status') && $order->status === Order::STATUS_DELIVERED) {
+            $shippingType = strtolower((string) ($order->shipping_type ?? ''));
+            if ($shippingType === 'pickup') {
+                $shipment = $order->shipment()->latest('created_at')->first();
+                if ($shipment && $shipment->status !== Shipment::STATUS_DELIVERED) {
+                    $shipment->updateStatus(Shipment::STATUS_DELIVERED);
+                    $shipment->addTrackingEvent('Pickup completed', 'Order picked up by customer');
+                }
+            }
+        }
+
         $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
 
         if ($previousStatus !== Order::STATUS_SHIPPED && $order->status === Order::STATUS_SHIPPED) {
