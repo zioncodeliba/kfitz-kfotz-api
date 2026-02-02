@@ -71,8 +71,8 @@ class YpayInvoiceService
                 'price' => $shippingLineTotal,
                 'quantity' => 1.0,
                 'vatIncluded' => true,
-                'name' => 'Shipping',
-                'description' => 'Shipping cost',
+                'name' => 'משלוח',
+                'description' => 'עלות משלוח',
             ];
         }
         $payload = [
