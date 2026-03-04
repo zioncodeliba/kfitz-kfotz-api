@@ -58,7 +58,7 @@ class CashcowProductPushService
      *     error_samples:array<int, array{sku:string, scope:string, message:string}>
      * }
      */
-    public function syncInventory(?callable $progress = null, ?int $maxProducts = null): array
+    public function syncInventory(?callable $progress = null, ?int $maxProducts = null, bool $withRetry = true): array
     {
         $this->ensureConfigured();
 
@@ -107,7 +107,10 @@ class CashcowProductPushService
                         } else {
                             $qty = $this->normalizeQuantity($product->stock_quantity);
                             try {
-                                $this->sendCreateOrUpdate($this->buildInventoryPayload($sku, $qty, (bool) $product->is_active));
+                                $this->sendCreateOrUpdate(
+                                    $this->buildInventoryPayload($sku, $qty, (bool) $product->is_active),
+                                    $withRetry
+                                );
                                 $productsUpdated++;
                                 $processedSkus[$sku] = true;
                                 $this->recordUpdated(
@@ -139,7 +142,10 @@ class CashcowProductPushService
 
                             $inventory = $this->normalizeQuantity($variation->inventory, $this->normalizeQuantity($product->stock_quantity));
                             try {
-                                $this->sendCreateOrUpdate($this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active));
+                                $this->sendCreateOrUpdate(
+                                    $this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active),
+                                    $withRetry
+                                );
                                 $variationsUpdated++;
                                 $processedSkus[$variationSku] = true;
                                 $this->recordUpdated(
@@ -734,14 +740,16 @@ class CashcowProductPushService
         return $total;
     }
 
-    private function sendCreateOrUpdate(array $payload): array
+    private function sendCreateOrUpdate(array $payload, bool $withRetry = true): array
     {
         $url = "{$this->baseUrl}/Api/Stores/CreateOrUpdatePrtoduct";
 
-        $response = Http::timeout(30)
-            ->retry(3, 1000)
-            ->asJson()
-            ->post($url, $payload);
+        $request = Http::timeout(30)->asJson();
+        if ($withRetry) {
+            $request = $request->retry(3, 1000);
+        }
+
+        $response = $request->post($url, $payload);
 
         if ($response->failed()) {
             Log::error('Cashcow product push failed', [
