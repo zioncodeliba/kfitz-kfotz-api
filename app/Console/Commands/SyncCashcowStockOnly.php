@@ -12,16 +12,24 @@ class SyncCashcowStockOnly extends Command
 {
     private const MAX_SUCCESS_SAMPLES = 100;
 
-    protected $signature = 'cashcow:sync-stock-only';
+    protected $signature = 'cashcow:sync-stock-only
+                            {--limit-products= : Process only the first N products (ordered by id)}';
 
     protected $description = 'Push stock-only inventory updates (qty + visibility) to Cashcow';
 
     public function handle(CashcowProductPushService $service, InforuEmailService $emailService): int
     {
+        $limitProducts = $this->parseProductsLimit();
+        if ($limitProducts === false) {
+            return self::FAILURE;
+        }
+
         $logLines = [];
         $successfulSkus = [];
         $updatedTotalLive = 0;
-        Log::info('[Cashcow] stock-only sync started');
+        Log::info('[Cashcow] stock-only sync started', [
+            'limit_products' => $limitProducts,
+        ]);
 
         try {
             $result = $service->syncInventory(function (array $event) use (&$logLines, &$successfulSkus, &$updatedTotalLive) {
@@ -64,7 +72,7 @@ class SyncCashcowStockOnly extends Command
                     $logLines[] = $line;
                     Log::warning('[Cashcow] ' . $line, ['event' => $event]);
                 }
-            });
+            }, $limitProducts);
         } catch (Throwable $e) {
             $this->error('Stock-only sync failed: ' . $e->getMessage());
             report($e);
@@ -82,7 +90,8 @@ class SyncCashcowStockOnly extends Command
         }
 
         $summary = sprintf(
-            'Stock-only sync completed. Synced Total: %d, Products: %d/%d, Variations: %d/%d, Skipped: %d, Errors: %d',
+            'Stock-only sync completed. Products Limit: %s, Synced Total: %d, Products: %d/%d, Variations: %d/%d, Skipped: %d, Errors: %d',
+            $limitProducts ?? 'all',
             $syncedTotal,
             $result['products_updated'] ?? 0,
             $result['products_processed'] ?? 0,
@@ -106,6 +115,7 @@ class SyncCashcowStockOnly extends Command
             'status' => 'success',
             'summary' => $summary,
             'synced_total' => $syncedTotal,
+            'products_limit' => $limitProducts,
         ];
 
         if (!empty($result['error_samples'])) {
@@ -139,6 +149,9 @@ class SyncCashcowStockOnly extends Command
         }
         if (!empty($meta['synced_total'])) {
             $lines[] = 'Synced total: ' . (int) $meta['synced_total'];
+        }
+        if (array_key_exists('products_limit', $meta)) {
+            $lines[] = 'Products limit: ' . ($meta['products_limit'] ?? 'all');
         }
         if (!empty($meta['successful_skus'])) {
             $lines[] = 'Successful SKUs (sample): ' . implode(', ', $meta['successful_skus']);
@@ -176,5 +189,26 @@ class SyncCashcowStockOnly extends Command
             'to' => $email,
             'status' => $meta['status'] ?? 'unknown',
         ]);
+    }
+
+    private function parseProductsLimit(): int|null|false
+    {
+        $raw = $this->option('limit-products');
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        if (!is_numeric($raw)) {
+            $this->error('Invalid --limit-products value. It must be a positive integer.');
+            return false;
+        }
+
+        $limit = (int) $raw;
+        if ($limit <= 0) {
+            $this->error('Invalid --limit-products value. It must be greater than 0.');
+            return false;
+        }
+
+        return $limit;
     }
 }

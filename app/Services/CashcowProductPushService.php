@@ -58,9 +58,12 @@ class CashcowProductPushService
      *     error_samples:array<int, array{sku:string, scope:string, message:string}>
      * }
      */
-    public function syncInventory(?callable $progress = null): array
+    public function syncInventory(?callable $progress = null, ?int $maxProducts = null): array
     {
         $this->ensureConfigured();
+
+        $productsLimit = $maxProducts !== null ? max(0, $maxProducts) : null;
+        $remainingProducts = $productsLimit;
 
         $processedSkus = [];
         $productsProcessed = 0;
@@ -86,67 +89,78 @@ class CashcowProductPushService
                 &$skippedSkus,
                 &$errors,
                 &$errorSamples,
+                &$remainingProducts,
                 $progress
             ) {
                 foreach ($products as $product) {
+                    if ($remainingProducts !== null && $remainingProducts <= 0) {
+                        return false;
+                    }
+
                     $productsProcessed++;
                     $sku = $this->normalizeSku($product->sku);
                     if ($sku === '') {
                         $this->recordSkip($skipped, $skippedSkus, '(missing sku)', $progress, 'product');
-                        continue;
-                    }
-
-                    if (isset($processedSkus[$sku])) {
-                        $this->recordSkip($skipped, $skippedSkus, $sku, $progress, 'product');
                     } else {
-                        $qty = $this->normalizeQuantity($product->stock_quantity);
-                        try {
-                            $this->sendCreateOrUpdate($this->buildInventoryPayload($sku, $qty, (bool) $product->is_active));
-                            $productsUpdated++;
-                            $processedSkus[$sku] = true;
-                            $this->recordUpdated(
-                                $progress,
-                                'product',
-                                $sku,
-                                $qty,
-                                (bool) $product->is_active,
-                                $productsUpdated,
-                                $variationsUpdated
-                            );
-                        } catch (\Throwable $exception) {
-                            $this->recordError($errors, $errorSamples, $sku, 'product', $exception->getMessage(), $progress);
+                        if (isset($processedSkus[$sku])) {
+                            $this->recordSkip($skipped, $skippedSkus, $sku, $progress, 'product');
+                        } else {
+                            $qty = $this->normalizeQuantity($product->stock_quantity);
+                            try {
+                                $this->sendCreateOrUpdate($this->buildInventoryPayload($sku, $qty, (bool) $product->is_active));
+                                $productsUpdated++;
+                                $processedSkus[$sku] = true;
+                                $this->recordUpdated(
+                                    $progress,
+                                    'product',
+                                    $sku,
+                                    $qty,
+                                    (bool) $product->is_active,
+                                    $productsUpdated,
+                                    $variationsUpdated
+                                );
+                            } catch (\Throwable $exception) {
+                                $this->recordError($errors, $errorSamples, $sku, 'product', $exception->getMessage(), $progress);
+                            }
+                        }
+
+                        foreach ($product->productVariations as $variation) {
+                            $variationsProcessed++;
+                            $variationSku = $this->normalizeSku($variation->sku);
+                            if ($variationSku === '') {
+                                $this->recordSkip($skipped, $skippedSkus, '(missing variation sku)', $progress, 'variation');
+                                continue;
+                            }
+
+                            if (isset($processedSkus[$variationSku])) {
+                                $this->recordSkip($skipped, $skippedSkus, $variationSku, $progress, 'variation');
+                                continue;
+                            }
+
+                            $inventory = $this->normalizeQuantity($variation->inventory, $this->normalizeQuantity($product->stock_quantity));
+                            try {
+                                $this->sendCreateOrUpdate($this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active));
+                                $variationsUpdated++;
+                                $processedSkus[$variationSku] = true;
+                                $this->recordUpdated(
+                                    $progress,
+                                    'variation',
+                                    $variationSku,
+                                    $inventory,
+                                    (bool) $product->is_active,
+                                    $productsUpdated,
+                                    $variationsUpdated
+                                );
+                            } catch (\Throwable $exception) {
+                                $this->recordError($errors, $errorSamples, $variationSku, 'variation', $exception->getMessage(), $progress);
+                            }
                         }
                     }
 
-                    foreach ($product->productVariations as $variation) {
-                        $variationsProcessed++;
-                        $variationSku = $this->normalizeSku($variation->sku);
-                        if ($variationSku === '') {
-                            $this->recordSkip($skipped, $skippedSkus, '(missing variation sku)', $progress, 'variation');
-                            continue;
-                        }
-
-                        if (isset($processedSkus[$variationSku])) {
-                            $this->recordSkip($skipped, $skippedSkus, $variationSku, $progress, 'variation');
-                            continue;
-                        }
-
-                        $inventory = $this->normalizeQuantity($variation->inventory, $this->normalizeQuantity($product->stock_quantity));
-                        try {
-                            $this->sendCreateOrUpdate($this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active));
-                            $variationsUpdated++;
-                            $processedSkus[$variationSku] = true;
-                            $this->recordUpdated(
-                                $progress,
-                                'variation',
-                                $variationSku,
-                                $inventory,
-                                (bool) $product->is_active,
-                                $productsUpdated,
-                                $variationsUpdated
-                            );
-                        } catch (\Throwable $exception) {
-                            $this->recordError($errors, $errorSamples, $variationSku, 'variation', $exception->getMessage(), $progress);
+                    if ($remainingProducts !== null) {
+                        $remainingProducts--;
+                        if ($remainingProducts <= 0) {
+                            return false;
                         }
                     }
                 }
@@ -158,6 +172,7 @@ class CashcowProductPushService
             'products_updated' => $productsUpdated,
             'variations_updated' => $variationsUpdated,
             'synced_total' => $productsUpdated + $variationsUpdated,
+            'products_limit' => $productsLimit,
             'skipped' => $skipped,
             'skipped_skus' => $skippedSkus,
             'errors' => $errors,
