@@ -90,7 +90,8 @@ class CashcowProductPushService
                 &$errors,
                 &$errorSamples,
                 &$remainingProducts,
-                $progress
+                $progress,
+                $withRetry
             ) {
                 foreach ($products as $product) {
                     if ($remainingProducts !== null && $remainingProducts <= 0) {
