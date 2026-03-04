@@ -9,6 +9,7 @@ use App\Console\Commands\SyncCashcowInventory;
 use App\Console\Commands\SyncChitaShipmentsCommand;
 use App\Console\Commands\SyncCashcowOrders;
 use App\Console\Commands\PushCashcowInventory;
+use App\Console\Commands\SyncCashcowStockOnly;
 use App\Console\Commands\ImportCashcowImages;
 use App\Console\Commands\ImportProductPricingFromCsv;
 use App\Console\Commands\SyncMerchantsFromCsv;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SyncChitaShipmentsCommand::class,
         SyncCashcowOrders::class,
         PushCashcowInventory::class,
+        SyncCashcowStockOnly::class,
         ImportCashcowImages::class,
         ImportProductPricingFromCsv::class,
         SyncMerchantsFromCsv::class,
@@ -42,6 +44,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // $schedule->command('cashcow:push-inventory')
         //     ->hourly()
         //     ->environments(['production']);
+        $schedule->command('cashcow:sync-stock-only')
+            ->everyTenMinutes()
+            ->environments(['production']);
         $schedule->command('chita:sync-statuses')->everyTenMinutes();
         $schedule->command('cashcow:sync-orders')->everyTenMinutes();
     })
