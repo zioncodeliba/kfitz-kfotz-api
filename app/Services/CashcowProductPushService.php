@@ -117,6 +117,7 @@ class CashcowProductPushService
                             $this->recordSkip($skipped, $skippedSkus, $sku, $progress, 'product');
                         } else {
                             $qty = $this->normalizeQuantity($product->stock_quantity);
+                            $requestStartedAt = microtime(true);
                             try {
                                 $this->sendCreateOrUpdate(
                                     $this->buildInventoryPayload($sku, $qty, (bool) $product->is_active),
@@ -131,10 +132,19 @@ class CashcowProductPushService
                                     $qty,
                                     (bool) $product->is_active,
                                     $productsUpdated,
-                                    $variationsUpdated
+                                    $variationsUpdated,
+                                    $this->requestDurationMs($requestStartedAt)
                                 );
                             } catch (\Throwable $exception) {
-                                $this->recordError($errors, $errorSamples, $sku, 'product', $exception->getMessage(), $progress);
+                                $this->recordError(
+                                    $errors,
+                                    $errorSamples,
+                                    $sku,
+                                    'product',
+                                    $exception->getMessage(),
+                                    $progress,
+                                    $this->requestDurationMs($requestStartedAt)
+                                );
                             }
                         }
 
@@ -153,6 +163,7 @@ class CashcowProductPushService
                                 }
 
                                 $inventory = $this->normalizeQuantity($variation->inventory, $this->normalizeQuantity($product->stock_quantity));
+                                $requestStartedAt = microtime(true);
                                 try {
                                     $this->sendCreateOrUpdate(
                                         $this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active),
@@ -167,10 +178,19 @@ class CashcowProductPushService
                                         $inventory,
                                         (bool) $product->is_active,
                                         $productsUpdated,
-                                        $variationsUpdated
+                                        $variationsUpdated,
+                                        $this->requestDurationMs($requestStartedAt)
                                     );
                                 } catch (\Throwable $exception) {
-                                    $this->recordError($errors, $errorSamples, $variationSku, 'variation', $exception->getMessage(), $progress);
+                                    $this->recordError(
+                                        $errors,
+                                        $errorSamples,
+                                        $variationSku,
+                                        'variation',
+                                        $exception->getMessage(),
+                                        $progress,
+                                        $this->requestDurationMs($requestStartedAt)
+                                    );
                                 }
                             }
                         }
@@ -901,7 +921,8 @@ class CashcowProductPushService
         int $qty,
         bool $visible,
         int $productsUpdated,
-        int $variationsUpdated
+        int $variationsUpdated,
+        ?int $requestDurationMs = null
     ): void {
         $this->report($progress, [
             'type' => 'updated',
@@ -912,6 +933,7 @@ class CashcowProductPushService
             'products_updated' => $productsUpdated,
             'variations_updated' => $variationsUpdated,
             'updated_total' => $productsUpdated + $variationsUpdated,
+            'request_duration_ms' => $requestDurationMs,
         ]);
     }
 
@@ -921,7 +943,8 @@ class CashcowProductPushService
         string $sku,
         string $scope,
         string $message,
-        ?callable $progress
+        ?callable $progress,
+        ?int $requestDurationMs = null
     ): void {
         $errors++;
 
@@ -938,7 +961,13 @@ class CashcowProductPushService
             'scope' => $scope,
             'sku' => $sku,
             'message' => $message,
+            'request_duration_ms' => $requestDurationMs,
         ]);
+    }
+
+    private function requestDurationMs(float $startedAt): int
+    {
+        return max(0, (int) round((microtime(true) - $startedAt) * 1000));
     }
 
     private function report(?callable $progress, array $event): void

@@ -39,19 +39,19 @@ class SyncCashcowStockOnly extends Command
                     $scope = (string) ($event['scope'] ?? 'unknown');
                     $sku = (string) ($event['sku'] ?? 'n/a');
                     $qty = (int) ($event['qty'] ?? 0);
+                    $duration = $this->formatDuration($event['request_duration_ms'] ?? null);
                     $line = sprintf(
-                        'Synced (%s) SKU %s qty=%d [total synced=%d]',
+                        'Synced (%s) SKU %s qty=%d [total synced=%d, request=%s]',
                         $scope,
                         $sku,
                         $qty,
-                        $updatedTotal
+                        $updatedTotal,
+                        $duration
                     );
 
-                    if ($updatedTotal <= 10 || $updatedTotal % 100 === 0) {
-                        $this->line($line);
-                        $logLines[] = $line;
-                        Log::info('[Cashcow] ' . $line);
-                    }
+                    $this->line($line);
+                    $logLines[] = $line;
+                    Log::info('[Cashcow] ' . $line);
 
                     if (count($successfulSkus) < self::MAX_SUCCESS_SAMPLES) {
                         $successfulSkus[] = sprintf('%s:%s(qty=%d)', $scope, $sku, $qty);
@@ -62,11 +62,13 @@ class SyncCashcowStockOnly extends Command
                 }
 
                 if ($type === 'error') {
+                    $duration = $this->formatDuration($event['request_duration_ms'] ?? null);
                     $line = sprintf(
-                        'Error (%s) %s: %s',
+                        'Error (%s) %s: %s [request=%s]',
                         $event['scope'] ?? 'unknown',
                         $event['sku'] ?? 'n/a',
-                        $event['message'] ?? 'unknown error'
+                        $event['message'] ?? 'unknown error',
+                        $duration
                     );
                     $this->error($line);
                     $logLines[] = $line;
@@ -210,5 +212,14 @@ class SyncCashcowStockOnly extends Command
         }
 
         return $limit;
+    }
+
+    private function formatDuration(mixed $value): string
+    {
+        if (!is_numeric($value)) {
+            return 'n/a';
+        }
+
+        return (string) ((int) $value) . 'ms';
     }
 }
