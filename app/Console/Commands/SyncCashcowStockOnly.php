@@ -72,7 +72,7 @@ class SyncCashcowStockOnly extends Command
                     $logLines[] = $line;
                     Log::warning('[Cashcow] ' . $line, ['event' => $event]);
                 }
-            }, $limitProducts, false);
+            }, $limitProducts, false, false);
         } catch (Throwable $e) {
             $this->error('Stock-only sync failed: ' . $e->getMessage());
             report($e);
