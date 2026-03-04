@@ -46,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
         //     ->environments(['production']);
         $schedule->command('cashcow:sync-stock-only')
             ->everyTenMinutes()
-            ->environments(['production']);
+            ->hourly(['production']);
         $schedule->command('chita:sync-statuses')->everyTenMinutes();
         $schedule->command('cashcow:sync-orders')->everyTenMinutes();
     })

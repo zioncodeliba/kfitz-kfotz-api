@@ -10,6 +10,8 @@ use Throwable;
 
 class SyncCashcowStockOnly extends Command
 {
+    private const MAX_SUCCESS_SAMPLES = 100;
+
     protected $signature = 'cashcow:sync-stock-only';
 
     protected $description = 'Push stock-only inventory updates (qty + visibility) to Cashcow';
@@ -17,11 +19,40 @@ class SyncCashcowStockOnly extends Command
     public function handle(CashcowProductPushService $service, InforuEmailService $emailService): int
     {
         $logLines = [];
+        $successfulSkus = [];
+        $updatedTotalLive = 0;
         Log::info('[Cashcow] stock-only sync started');
 
         try {
-            $result = $service->syncInventory(function (array $event) use (&$logLines) {
+            $result = $service->syncInventory(function (array $event) use (&$logLines, &$successfulSkus, &$updatedTotalLive) {
                 $type = $event['type'] ?? '';
+                if ($type === 'updated') {
+                    $updatedTotal = (int) ($event['updated_total'] ?? 0);
+                    $scope = (string) ($event['scope'] ?? 'unknown');
+                    $sku = (string) ($event['sku'] ?? 'n/a');
+                    $qty = (int) ($event['qty'] ?? 0);
+                    $line = sprintf(
+                        'Synced (%s) SKU %s qty=%d [total synced=%d]',
+                        $scope,
+                        $sku,
+                        $qty,
+                        $updatedTotal
+                    );
+
+                    if ($updatedTotal <= 10 || $updatedTotal % 100 === 0) {
+                        $this->line($line);
+                        $logLines[] = $line;
+                        Log::info('[Cashcow] ' . $line);
+                    }
+
+                    if (count($successfulSkus) < self::MAX_SUCCESS_SAMPLES) {
+                        $successfulSkus[] = sprintf('%s:%s(qty=%d)', $scope, $sku, $qty);
+                    }
+
+                    $updatedTotalLive = $updatedTotal;
+                    return;
+                }
+
                 if ($type === 'error') {
                     $line = sprintf(
                         'Error (%s) %s: %s',
@@ -45,8 +76,14 @@ class SyncCashcowStockOnly extends Command
             return self::FAILURE;
         }
 
+        $syncedTotal = (int) ($result['synced_total'] ?? (($result['products_updated'] ?? 0) + ($result['variations_updated'] ?? 0)));
+        if ($updatedTotalLive > $syncedTotal) {
+            $syncedTotal = $updatedTotalLive;
+        }
+
         $summary = sprintf(
-            'Stock-only sync completed. Products: %d/%d, Variations: %d/%d, Skipped: %d, Errors: %d',
+            'Stock-only sync completed. Synced Total: %d, Products: %d/%d, Variations: %d/%d, Skipped: %d, Errors: %d',
+            $syncedTotal,
             $result['products_updated'] ?? 0,
             $result['products_processed'] ?? 0,
             $result['variations_updated'] ?? 0,
@@ -58,9 +95,17 @@ class SyncCashcowStockOnly extends Command
         $this->info($summary);
         Log::info('[Cashcow] ' . $summary);
 
+        if (!empty($successfulSkus)) {
+            $successLine = 'Successful SKUs (sample): ' . implode(', ', $successfulSkus);
+            $this->line($successLine);
+            Log::info('[Cashcow] ' . $successLine);
+            $logLines[] = $successLine;
+        }
+
         $meta = [
             'status' => 'success',
             'summary' => $summary,
+            'synced_total' => $syncedTotal,
         ];
 
         if (!empty($result['error_samples'])) {
@@ -69,6 +114,10 @@ class SyncCashcowStockOnly extends Command
 
         if (!empty($result['skipped_skus'])) {
             $meta['skipped'] = $result['skipped_skus'];
+        }
+
+        if (!empty($successfulSkus)) {
+            $meta['successful_skus'] = $successfulSkus;
         }
 
         $this->sendReport($emailService, $logLines, $meta);
@@ -87,6 +136,12 @@ class SyncCashcowStockOnly extends Command
         $lines = $logLines;
         if (!empty($meta['summary'])) {
             array_unshift($lines, $meta['summary']);
+        }
+        if (!empty($meta['synced_total'])) {
+            $lines[] = 'Synced total: ' . (int) $meta['synced_total'];
+        }
+        if (!empty($meta['successful_skus'])) {
+            $lines[] = 'Successful SKUs (sample): ' . implode(', ', $meta['successful_skus']);
         }
         if (!empty($meta['skipped'])) {
             $lines[] = 'Skipped SKUs: ' . implode(', ', $meta['skipped']);

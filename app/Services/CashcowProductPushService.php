@@ -51,13 +51,14 @@ class CashcowProductPushService
      *     variations_processed:int,
      *     products_updated:int,
      *     variations_updated:int,
+     *     synced_total:int,
      *     skipped:int,
      *     skipped_skus:array<int, string>,
      *     errors:int,
      *     error_samples:array<int, array{sku:string, scope:string, message:string}>
      * }
      */
-    public function syncInventory(callable $progress = null): array
+    public function syncInventory(?callable $progress = null): array
     {
         $this->ensureConfigured();
 
@@ -103,6 +104,15 @@ class CashcowProductPushService
                             $this->sendCreateOrUpdate($this->buildInventoryPayload($sku, $qty, (bool) $product->is_active));
                             $productsUpdated++;
                             $processedSkus[$sku] = true;
+                            $this->recordUpdated(
+                                $progress,
+                                'product',
+                                $sku,
+                                $qty,
+                                (bool) $product->is_active,
+                                $productsUpdated,
+                                $variationsUpdated
+                            );
                         } catch (\Throwable $exception) {
                             $this->recordError($errors, $errorSamples, $sku, 'product', $exception->getMessage(), $progress);
                         }
@@ -126,6 +136,15 @@ class CashcowProductPushService
                             $this->sendCreateOrUpdate($this->buildInventoryPayload($variationSku, $inventory, (bool) $product->is_active));
                             $variationsUpdated++;
                             $processedSkus[$variationSku] = true;
+                            $this->recordUpdated(
+                                $progress,
+                                'variation',
+                                $variationSku,
+                                $inventory,
+                                (bool) $product->is_active,
+                                $productsUpdated,
+                                $variationsUpdated
+                            );
                         } catch (\Throwable $exception) {
                             $this->recordError($errors, $errorSamples, $variationSku, 'variation', $exception->getMessage(), $progress);
                         }
@@ -138,6 +157,7 @@ class CashcowProductPushService
             'variations_processed' => $variationsProcessed,
             'products_updated' => $productsUpdated,
             'variations_updated' => $variationsUpdated,
+            'synced_total' => $productsUpdated + $variationsUpdated,
             'skipped' => $skipped,
             'skipped_skus' => $skippedSkus,
             'errors' => $errors,
@@ -835,6 +855,27 @@ class CashcowProductPushService
             'type' => 'skipped',
             'scope' => $scope,
             'sku' => $sku,
+        ]);
+    }
+
+    private function recordUpdated(
+        ?callable $progress,
+        string $scope,
+        string $sku,
+        int $qty,
+        bool $visible,
+        int $productsUpdated,
+        int $variationsUpdated
+    ): void {
+        $this->report($progress, [
+            'type' => 'updated',
+            'scope' => $scope,
+            'sku' => $sku,
+            'qty' => $qty,
+            'is_visible' => $visible,
+            'products_updated' => $productsUpdated,
+            'variations_updated' => $variationsUpdated,
+            'updated_total' => $productsUpdated + $variationsUpdated,
         ]);
     }
 
