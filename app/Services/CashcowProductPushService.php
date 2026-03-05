@@ -220,6 +220,133 @@ class CashcowProductPushService
     }
 
     /**
+     * Push inventory updates to Cashcow for a specific SKU list only.
+     *
+     * @param array<int, string> $skus
+     * @return array{
+     *     requested:int,
+     *     found:int,
+     *     updated:int,
+     *     missing_local:int,
+     *     missing_skus:array<int, string>,
+     *     errors:int,
+     *     error_samples:array<int, array{sku:string,scope:string,message:string}>
+     * }
+     */
+    public function syncInventoryBySkus(array $skus, ?callable $progress = null, bool $withRetry = false): array
+    {
+        $this->ensureConfigured();
+
+        $normalizedSkus = [];
+        $seen = [];
+        foreach ($skus as $rawSku) {
+            $sku = $this->normalizeSku((string) $rawSku);
+            if ($sku === '' || isset($seen[$sku])) {
+                continue;
+            }
+
+            $normalizedSkus[] = $sku;
+            $seen[$sku] = true;
+        }
+
+        $requested = count($normalizedSkus);
+        if ($requested === 0) {
+            return [
+                'requested' => 0,
+                'found' => 0,
+                'updated' => 0,
+                'missing_local' => 0,
+                'missing_skus' => [],
+                'errors' => 0,
+                'error_samples' => [],
+            ];
+        }
+
+        $productsBySku = Product::query()
+            ->select(['id', 'sku', 'stock_quantity', 'is_active'])
+            ->whereIn('sku', $normalizedSkus)
+            ->get()
+            ->keyBy('sku');
+
+        $updated = 0;
+        $missingLocal = 0;
+        $missingSkus = [];
+        $errors = 0;
+        $errorSamples = [];
+
+        foreach ($normalizedSkus as $index => $sku) {
+            $position = $index + 1;
+            $product = $productsBySku->get($sku);
+            if (!$product) {
+                $missingLocal++;
+                if (count($missingSkus) < self::MAX_SAMPLE_ITEMS) {
+                    $missingSkus[] = $sku;
+                }
+
+                $this->report($progress, [
+                    'type' => 'missing_local',
+                    'scope' => 'product',
+                    'sku' => $sku,
+                    'position' => $position,
+                    'target_total' => $requested,
+                ]);
+                continue;
+            }
+
+            $qty = $this->normalizeQuantity($product->stock_quantity);
+            $requestStartedAt = microtime(true);
+            try {
+                $this->sendCreateOrUpdate(
+                    $this->buildInventoryPayload($sku, $qty, (bool) $product->is_active),
+                    $withRetry
+                );
+
+                $updated++;
+                $this->report($progress, [
+                    'type' => 'updated',
+                    'scope' => 'product',
+                    'sku' => $sku,
+                    'qty' => $qty,
+                    'is_visible' => (bool) $product->is_active,
+                    'updated_total' => $updated,
+                    'position' => $position,
+                    'target_total' => $requested,
+                    'request_duration_ms' => $this->requestDurationMs($requestStartedAt),
+                ]);
+            } catch (\Throwable $exception) {
+                $errors++;
+                if (count($errorSamples) < self::MAX_SAMPLE_ITEMS) {
+                    $errorSamples[] = [
+                        'sku' => $sku,
+                        'scope' => 'product',
+                        'message' => $exception->getMessage(),
+                    ];
+                }
+
+                $this->report($progress, [
+                    'type' => 'error',
+                    'scope' => 'product',
+                    'sku' => $sku,
+                    'message' => $exception->getMessage(),
+                    'position' => $position,
+                    'target_total' => $requested,
+                    'request_duration_ms' => $this->requestDurationMs($requestStartedAt),
+                ]);
+            }
+        }
+
+        return [
+            'requested' => $requested,
+            'found' => $requested - $missingLocal,
+            'updated' => $updated,
+            'missing_local' => $missingLocal,
+            'missing_skus' => $missingSkus,
+            'errors' => $errors,
+            'error_samples' => $errorSamples,
+        ];
+    }
+
+    /**
      * Create a new product in Cashcow based on the local product data.
      */
     public function createProduct(Product $product): array

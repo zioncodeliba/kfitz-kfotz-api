@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\CashcowInventorySyncService;
+use App\Services\CashcowProductPushService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -11,11 +12,13 @@ class AnalyzeCashcowInventoryDiff extends Command
 {
     protected $signature = 'cashcow:analyze-inventory-diff
                             {--page-size=20 : Cashcow page size for GetQty API}
-                            {--max-pages= : Optional max pages to scan (for testing)}';
+                            {--max-pages= : Optional max pages to scan (for testing)}
+                            {--apply-changes : Push only changed SKUs from local DB to Cashcow}
+                            {--with-retry : Use retry while pushing changed SKUs to Cashcow}';
 
-    protected $description = 'Analyze Cashcow inventory against local DB without applying any updates';
+    protected $description = 'Analyze Cashcow inventory against local DB, with optional apply for changed SKUs only';
 
-    public function handle(CashcowInventorySyncService $syncService): int
+    public function handle(CashcowInventorySyncService $syncService, CashcowProductPushService $pushService): int
     {
         $pageSize = $this->parsePositiveIntOption('page-size', true);
         if ($pageSize === false) {
@@ -96,6 +99,91 @@ class AnalyzeCashcowInventoryDiff extends Command
         $this->line('new_from_cashcow: ' . count($newFromCashcow));
         $this->line('inventory_changes: ' . count($inventoryChanges));
 
+        if ($this->option('apply-changes')) {
+            $changedSkus = $this->extractChangedSkus($inventoryChanges);
+            $this->line('');
+            $this->info(sprintf(
+                'Applying inventory changes to Cashcow for changed SKUs only (count=%d, with_retry=%s)',
+                count($changedSkus),
+                $this->option('with-retry') ? 'yes' : 'no'
+            ));
+            Log::info('[Cashcow] inventory diff apply started', [
+                'changed_skus_count' => count($changedSkus),
+                'with_retry' => (bool) $this->option('with-retry'),
+            ]);
+
+            try {
+                $pushResult = $pushService->syncInventoryBySkus(
+                    $changedSkus,
+                    function (array $event): void {
+                        $type = $event['type'] ?? '';
+                        if ($type === 'updated') {
+                            $line = sprintf(
+                                'Applied SKU %s qty=%d (%d/%d) [request=%s]',
+                                (string) ($event['sku'] ?? 'n/a'),
+                                (int) ($event['qty'] ?? 0),
+                                (int) ($event['position'] ?? 0),
+                                (int) ($event['target_total'] ?? 0),
+                                $this->formatDuration($event['request_duration_ms'] ?? null)
+                            );
+                            $this->line($line);
+                            Log::info('[Cashcow] ' . $line);
+                            return;
+                        }
+
+                        if ($type === 'missing_local') {
+                            $line = sprintf(
+                                'Skipped missing local SKU %s (%d/%d)',
+                                (string) ($event['sku'] ?? 'n/a'),
+                                (int) ($event['position'] ?? 0),
+                                (int) ($event['target_total'] ?? 0)
+                            );
+                            $this->warn($line);
+                            Log::warning('[Cashcow] ' . $line, ['event' => $event]);
+                            return;
+                        }
+
+                        if ($type === 'error') {
+                            $line = sprintf(
+                                'Apply error SKU %s: %s (%d/%d) [request=%s]',
+                                (string) ($event['sku'] ?? 'n/a'),
+                                (string) ($event['message'] ?? 'unknown error'),
+                                (int) ($event['position'] ?? 0),
+                                (int) ($event['target_total'] ?? 0),
+                                $this->formatDuration($event['request_duration_ms'] ?? null)
+                            );
+                            $this->error($line);
+                            Log::warning('[Cashcow] ' . $line, ['event' => $event]);
+                        }
+                    },
+                    (bool) $this->option('with-retry')
+                );
+            } catch (Throwable $e) {
+                $this->error('Apply failed: ' . $e->getMessage());
+                report($e);
+                Log::error('[Cashcow] inventory diff apply failed', ['exception' => $e]);
+                return self::FAILURE;
+            }
+
+            $applySummary = sprintf(
+                'Apply completed. Requested: %d, Found: %d, Updated: %d, Missing local: %d, Errors: %d',
+                (int) ($pushResult['requested'] ?? 0),
+                (int) ($pushResult['found'] ?? 0),
+                (int) ($pushResult['updated'] ?? 0),
+                (int) ($pushResult['missing_local'] ?? 0),
+                (int) ($pushResult['errors'] ?? 0)
+            );
+            $this->info($applySummary);
+            Log::info('[Cashcow] ' . $applySummary);
+
+            if (!empty($pushResult['missing_skus'])) {
+                $this->line('Missing local SKUs (sample): ' . implode(', ', $pushResult['missing_skus']));
+            }
+            if (!empty($pushResult['error_samples'])) {
+                $this->line('Apply error samples: ' . $this->toJson($pushResult['error_samples']));
+            }
+        }
+
         return self::SUCCESS;
     }
 
@@ -129,5 +217,35 @@ class AnalyzeCashcowInventoryDiff extends Command
     private function toJson(array $payload): string
     {
         return (string) json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * @param array<int, array{sku?:mixed}> $inventoryChanges
+     * @return array<int, string>
+     */
+    private function extractChangedSkus(array $inventoryChanges): array
+    {
+        $skus = [];
+        $seen = [];
+        foreach ($inventoryChanges as $row) {
+            $sku = trim((string) ($row['sku'] ?? ''));
+            if ($sku === '' || isset($seen[$sku])) {
+                continue;
+            }
+
+            $skus[] = $sku;
+            $seen[$sku] = true;
+        }
+
+        return $skus;
+    }
+
+    private function formatDuration(mixed $value): string
+    {
+        if (!is_numeric($value)) {
+            return 'n/a';
+        }
+
+        return (string) ((int) $value) . 'ms';
     }
 }
