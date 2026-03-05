@@ -30,7 +30,7 @@ class CashcowInventorySyncService
     /**
      * @param callable|null $progress optional progress callback accepting an event array
      */
-    public function sync(callable $progress = null): array
+    public function sync(?callable $progress = null): array
     {
         $page = 1;
         $pages = 0;
@@ -158,8 +158,162 @@ class CashcowInventorySyncService
         ];
     }
 
-    private function fetchPage(int $page): array
+    /**
+     * Analyze Cashcow inventory against local products without applying updates.
+     *
+     * @return array{
+     *     pages:int,
+     *     scanned:int,
+     *     unchanged:int,
+     *     duplicates:int,
+     *     new_from_cashcow:array<int, array{sku:string,cashcow_qty:int,cashcow_product_id:int|string|null,page:int}>,
+     *     inventory_changes:array<int, array{sku:string,product_id:int,local_qty:int,cashcow_qty:int,delta:int,page:int}>
+     * }
+     */
+    public function analyzeInventoryDiff(?callable $progress = null, ?int $pageSize = null, ?int $maxPages = null): array
     {
+        if (empty($this->token) || empty($this->storeId)) {
+            throw new \RuntimeException('CASHCOW_TOKEN or CASHCOW_STORE_ID is not configured.');
+        }
+
+        $effectivePageSize = $this->resolvePositiveInt($pageSize, $this->pageSize);
+        $maxPages = $this->resolvePositiveInt($maxPages, null);
+
+        $page = 1;
+        $pages = 0;
+        $scanned = 0;
+        $unchanged = 0;
+        $duplicates = 0;
+        $seenSkus = [];
+        $newFromCashcow = [];
+        $inventoryChanges = [];
+
+        while (true) {
+            if ($maxPages !== null && $pages >= $maxPages) {
+                break;
+            }
+
+            $payload = $this->fetchPage($page, $effectivePageSize);
+            $items = is_array($payload['result'] ?? null) ? $payload['result'] : [];
+
+            $this->report($progress, [
+                'type' => 'page',
+                'page' => $page,
+                'items' => count($items),
+                'page_size' => (int) ($payload['page_size'] ?? $effectivePageSize),
+                'total_records' => $payload['total_records'] ?? null,
+            ]);
+
+            $pages++;
+            if (empty($items)) {
+                break;
+            }
+
+            $pageSkus = [];
+            foreach ($items as $item) {
+                $sku = trim((string) ($item['sku'] ?? ''));
+                if ($sku !== '') {
+                    $pageSkus[$sku] = true;
+                }
+            }
+
+            $productsBySku = Product::query()
+                ->select(['id', 'sku', 'stock_quantity'])
+                ->whereIn('sku', array_keys($pageSkus))
+                ->get()
+                ->keyBy('sku');
+
+            foreach ($items as $item) {
+                $sku = trim((string) ($item['sku'] ?? ''));
+                if ($sku === '') {
+                    continue;
+                }
+
+                if (isset($seenSkus[$sku])) {
+                    $duplicates++;
+                    continue;
+                }
+                $seenSkus[$sku] = true;
+
+                $scanned++;
+                $remoteQty = $this->normalizeQuantity($item['qty'] ?? 0);
+                $localProduct = $productsBySku->get($sku);
+
+                if (!$localProduct) {
+                    $newFromCashcow[] = [
+                        'sku' => $sku,
+                        'cashcow_qty' => $remoteQty,
+                        'cashcow_product_id' => $item['product_id'] ?? null,
+                        'page' => $page,
+                    ];
+
+                    $this->report($progress, [
+                        'type' => 'new_product',
+                        'sku' => $sku,
+                        'cashcow_qty' => $remoteQty,
+                        'cashcow_product_id' => $item['product_id'] ?? null,
+                        'page' => $page,
+                    ]);
+                    continue;
+                }
+
+                $localQty = $this->normalizeQuantity($localProduct->stock_quantity ?? 0);
+                if ($localQty === $remoteQty) {
+                    $unchanged++;
+                    continue;
+                }
+
+                $inventoryChanges[] = [
+                    'sku' => $sku,
+                    'product_id' => (int) $localProduct->id,
+                    'local_qty' => $localQty,
+                    'cashcow_qty' => $remoteQty,
+                    'delta' => $remoteQty - $localQty,
+                    'page' => $page,
+                ];
+
+                $this->report($progress, [
+                    'type' => 'qty_change',
+                    'sku' => $sku,
+                    'product_id' => (int) $localProduct->id,
+                    'local_qty' => $localQty,
+                    'cashcow_qty' => $remoteQty,
+                    'delta' => $remoteQty - $localQty,
+                    'page' => $page,
+                ]);
+            }
+
+            $this->report($progress, [
+                'type' => 'page_summary',
+                'page' => $page,
+                'items' => count($items),
+                'new_count' => count($newFromCashcow),
+                'changes_count' => count($inventoryChanges),
+                'unchanged' => $unchanged,
+                'scanned' => $scanned,
+            ]);
+
+            if (count($items) < $effectivePageSize) {
+                break;
+            }
+
+            $page++;
+            usleep(500000); // respect remote API
+        }
+
+        return [
+            'pages' => $pages,
+            'scanned' => $scanned,
+            'unchanged' => $unchanged,
+            'duplicates' => $duplicates,
+            'new_from_cashcow' => $newFromCashcow,
+            'inventory_changes' => $inventoryChanges,
+        ];
+    }
+
+    private function fetchPage(int $page, ?int $pageSize = null): array
+    {
+        $size = $this->resolvePositiveInt($pageSize, $this->pageSize);
         $url = "{$this->baseUrl}/Api/Products/GetQty";
 
         $response = Http::timeout(30)
@@ -168,7 +322,7 @@ class CashcowInventorySyncService
                 'token' => $this->token,
                 'store_id' => $this->storeId,
                 'page' => $page,
-                'page_size' => $this->pageSize,
+                'page_size' => $size,
             ]);
 
         if ($response->failed()) {
@@ -181,6 +335,33 @@ class CashcowInventorySyncService
         }
 
         return $response->json() ?? [];
+    }
+
+    private function resolvePositiveInt($value, ?int $fallback): ?int
+    {
+        if ($value === null || $value === '') {
+            return $fallback;
+        }
+
+        if (!is_numeric($value)) {
+            return $fallback;
+        }
+
+        $intValue = (int) $value;
+        if ($intValue <= 0) {
+            return $fallback;
+        }
+
+        return $intValue;
+    }
+
+    private function normalizeQuantity($value): int
+    {
+        if (!is_numeric($value)) {
+            return 0;
+        }
+
+        return (int) round((float) $value);
     }
 
     private function report(?callable $progress, array $event): void

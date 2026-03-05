@@ -10,6 +10,7 @@ use App\Console\Commands\SyncChitaShipmentsCommand;
 use App\Console\Commands\SyncCashcowOrders;
 use App\Console\Commands\PushCashcowInventory;
 use App\Console\Commands\SyncCashcowStockOnly;
+use App\Console\Commands\AnalyzeCashcowInventoryDiff;
 use App\Console\Commands\ImportCashcowImages;
 use App\Console\Commands\ImportProductPricingFromCsv;
 use App\Console\Commands\SyncMerchantsFromCsv;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         SyncCashcowOrders::class,
         PushCashcowInventory::class,
         SyncCashcowStockOnly::class,
+        AnalyzeCashcowInventoryDiff::class,
         ImportCashcowImages::class,
         ImportProductPricingFromCsv::class,
         SyncMerchantsFromCsv::class,
