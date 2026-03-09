@@ -279,7 +279,7 @@ class CashcowOrderSyncService
 
         $createdOrder = null;
 
-        $action = DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, &$createdOrder) {
+        $action = DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, $shipping, &$createdOrder) {
             $order = Order::where('source', 'cashcow')
                 ->where('source_reference', $orderPayload['source_reference'])
                 ->first();
@@ -294,8 +294,31 @@ class CashcowOrderSyncService
                 $action = 'created';
                 $createdOrder = $order;
             } else {
-                // Existing order: skip to avoid overriding manual changes.
-                return 'skipped_existing';
+                // Existing order: skip only when status context is unchanged.
+                if ($this->hasSameStatusContext($order, $orderPayload)) {
+                    return 'skipped_existing';
+                }
+
+                $incomingMetadata = is_array($orderPayload['source_metadata'] ?? null)
+                    ? $orderPayload['source_metadata']
+                    : [];
+                $existingMetadata = is_array($order->source_metadata)
+                    ? $order->source_metadata
+                    : [];
+
+                // Update only local order status/payment context from Cashcow.
+                $order->fill([
+                    'merchant_customer_id' => $orderPayload['merchant_customer_id'],
+                    'status' => $orderPayload['status'],
+                    'payment_status' => $orderPayload['payment_status'],
+                    'source_metadata' => array_merge($existingMetadata, $incomingMetadata),
+                    'invoice_provider' => $orderPayload['invoice_provider'],
+                    'invoice_url' => $orderPayload['invoice_url'],
+                    'shipping_type' => $orderPayload['shipping_type'],
+                    'shipping_method' => $orderPayload['shipping_method'],
+                    'notes' => $orderPayload['notes'],
+                ]);
+                $order->save();
             }
 
             if ($action === 'created' && $orderDate) {
@@ -305,29 +328,31 @@ class CashcowOrderSyncService
                 ])->saveQuietly();
             }
 
-            $productsToRefresh = [];
+            if ($action === 'created') {
+                $productsToRefresh = [];
 
-            foreach ($itemsContext['items'] as $item) {
-                $order->items()->create([
-                    'product_id' => $item['product']->id,
-                    'product_name' => $item['name'],
-                    'product_sku' => $item['sku'],
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                    'product_data' => $item['product_data'],
-                ]);
+                foreach ($itemsContext['items'] as $item) {
+                    $order->items()->create([
+                        'product_id' => $item['product']->id,
+                        'product_name' => $item['name'],
+                        'product_sku' => $item['sku'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total_price' => $item['total_price'],
+                        'product_data' => $item['product_data'],
+                    ]);
 
-                $item['product']->decrement('stock_quantity', $item['quantity']);
-                if ($item['variation'] && $item['variation']->inventory !== null) {
-                    $item['variation']->decrement('inventory', $item['quantity']);
+                    $item['product']->decrement('stock_quantity', $item['quantity']);
+                    if ($item['variation'] && $item['variation']->inventory !== null) {
+                        $item['variation']->decrement('inventory', $item['quantity']);
+                    }
+
+                    $productsToRefresh[$item['product']->id] = $item['product'];
                 }
 
-                $productsToRefresh[$item['product']->id] = $item['product'];
-            }
-
-            foreach ($productsToRefresh as $productToRefresh) {
-                $this->refreshProductVariationsSnapshot($productToRefresh);
+                foreach ($productsToRefresh as $productToRefresh) {
+                    $this->refreshProductVariationsSnapshot($productToRefresh);
+                }
             }
 
             // If Cashcow marked it as shipped (status 6), ensure we have an active shipment row.
@@ -599,6 +624,15 @@ class CashcowOrderSyncService
             'method' => 'pickup',
             'label' => 'pickup',
         ];
+    }
+
+    protected function hasSameStatusContext(Order $order, array $orderPayload): bool
+    {
+        $incomingStatus = (string) ($orderPayload['status'] ?? '');
+        $incomingPaymentStatus = (string) ($orderPayload['payment_status'] ?? '');
+
+        return (string) $order->status === $incomingStatus
+            && (string) $order->payment_status === $incomingPaymentStatus;
     }
 
     protected function mapStatus(int $orderStatus): array
