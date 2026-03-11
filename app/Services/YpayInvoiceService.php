@@ -10,6 +10,11 @@ use Illuminate\Support\Facades\Log;
 
 class YpayInvoiceService
 {
+    public function __construct(
+        private readonly YpayTestPdfService $ypayTestPdfService
+    ) {
+    }
+
     /**
      * @return array{invoice_url:string, payload:array}
      */
@@ -285,6 +290,15 @@ class YpayInvoiceService
      */
     private function sendDocument(array $payload): array
     {
+        if ((bool) config('ypay.use_test_pdf', false)) {
+            $documentJson = $this->ypayTestPdfService->generate($payload);
+
+            return [
+                'invoice_url' => (string) $documentJson['url'],
+                'payload' => $documentJson,
+            ];
+        }
+
         $baseUrl = rtrim((string) config('ypay.base_url'), '/');
         $accessTokenPath = (string) config('ypay.access_token_path');
         $documentGeneratorPath = (string) config('ypay.document_generator_path');
