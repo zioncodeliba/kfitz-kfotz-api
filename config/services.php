@@ -45,4 +45,8 @@ return [
         'timeout' => env('INFORU_TIMEOUT', 20),
     ],
 
+    'toyland' => [
+        'inventory_sync_url' => env('TOYLAND_INVENTORY_SYNC_URL'),
+    ],
+
 ];

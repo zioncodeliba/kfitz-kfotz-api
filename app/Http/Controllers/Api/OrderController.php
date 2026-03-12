@@ -18,6 +18,7 @@ use App\Services\EmailTemplateService;
 use App\Services\YpayInvoiceService;
 use App\Services\ChitaShipmentService;
 use App\Services\OrderEmailPayloadService;
+use App\Services\ProductInventoryTransitionService;
 use App\Exceptions\ChitaShipmentException;
 use App\Http\Resources\ShippingCarrierResource;
 use Illuminate\Http\Request;
@@ -40,7 +41,8 @@ class OrderController extends Controller
         protected ShippingSettingsService $shippingSettingsService,
         protected EmailTemplateService $emailTemplateService,
         protected ChitaShipmentService $chitaShipmentService,
-        protected OrderEmailPayloadService $orderEmailPayloadService
+        protected OrderEmailPayloadService $orderEmailPayloadService,
+        protected ProductInventoryTransitionService $productInventoryTransitionService
     ) {
     }
 
@@ -479,6 +481,7 @@ class OrderController extends Controller
 
             // Create order items and update stock
             $productsToRefresh = [];
+            $productStockBefore = [];
 
             foreach ($normalizedItems as $itemData) {
                 /** @var Product $product */
@@ -539,6 +542,9 @@ class OrderController extends Controller
                 ]);
 
                 // Update stock
+                if (!array_key_exists($product->id, $productStockBefore)) {
+                    $productStockBefore[$product->id] = (float) ($product->stock_quantity ?? 0);
+                }
                 $product->decrement('stock_quantity', $deliveredQuantity);
                 if ($variation && $variation->inventory !== null) {
                     $variation->decrement('inventory', $deliveredQuantity);
@@ -555,6 +561,15 @@ class OrderController extends Controller
 
             if ($merchantUser) {
                 $merchantUser->refreshOrderFinancials();
+            }
+
+            foreach ($productStockBefore as $productId => $previousStock) {
+                if (isset($productsToRefresh[$productId])) {
+                    $this->productInventoryTransitionService->handleOutOfStockTransition(
+                        $productsToRefresh[$productId],
+                        $previousStock
+                    );
+                }
             }
 
             $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
@@ -1284,6 +1299,7 @@ class OrderController extends Controller
 
             $subtotal = 0.0;
             $productsToRefresh = [];
+            $productStockBefore = [];
 
             foreach ($validated['items'] as $itemData) {
                 /** @var Product $product */
@@ -1341,6 +1357,9 @@ class OrderController extends Controller
                     'product_data' => $productData,
                 ]);
 
+                if (!array_key_exists($product->id, $productStockBefore)) {
+                    $productStockBefore[$product->id] = (float) ($product->stock_quantity ?? 0);
+                }
                 $product->decrement('stock_quantity', $quantity);
                 if ($variation && $variation->inventory !== null) {
                     $variation->decrement('inventory', $quantity);
@@ -1374,6 +1393,15 @@ class OrderController extends Controller
             $order->load(['items.product', 'user', 'merchant', 'merchantCustomer', 'carrier']);
 
             DB::commit();
+
+            foreach ($productStockBefore as $productId => $previousStock) {
+                if (isset($productsToRefresh[$productId])) {
+                    $this->productInventoryTransitionService->handleOutOfStockTransition(
+                        $productsToRefresh[$productId],
+                        $previousStock
+                    );
+                }
+            }
 
             return $this->successResponse($order, 'Order items updated successfully');
         } catch (\Throwable $e) {

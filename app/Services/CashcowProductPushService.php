@@ -347,6 +347,85 @@ class CashcowProductPushService
     }
 
     /**
+     * Push inventory updates for a single product and its variations.
+     *
+     * @return array{
+     *     requested:int,
+     *     updated:int,
+     *     errors:int,
+     *     error_samples:array<int, array{sku:string,scope:string,message:string}>,
+     *     skipped:int,
+     *     skipped_skus:array<int, string>
+     * }
+     */
+    public function syncInventoryForProduct(Product $product, bool $withRetry = false): array
+    {
+        $this->ensureConfigured();
+
+        $product->loadMissing(['productVariations:id,product_id,sku,inventory']);
+
+        $items = $this->buildInventoryItemsForProduct($product);
+        $requested = count($items);
+
+        if ($requested === 0) {
+            return [
+                'requested' => 0,
+                'updated' => 0,
+                'errors' => 0,
+                'error_samples' => [],
+                'skipped' => 0,
+                'skipped_skus' => [],
+            ];
+        }
+
+        $updated = 0;
+        $errors = 0;
+        $errorSamples = [];
+        $skipped = 0;
+        $skippedSkus = [];
+
+        foreach ($items as $item) {
+            $sku = $item['sku'];
+            $scope = $item['scope'];
+            $qty = $item['qty'];
+
+            if ($sku === '') {
+                $skipped++;
+                if (count($skippedSkus) < self::MAX_SAMPLE_ITEMS) {
+                    $skippedSkus[] = '(missing sku)';
+                }
+                continue;
+            }
+
+            try {
+                $this->sendCreateOrUpdate(
+                    $this->buildInventoryPayload($sku, $qty, (bool) $product->is_active),
+                    $withRetry
+                );
+                $updated++;
+            } catch (\Throwable $exception) {
+                $errors++;
+                if (count($errorSamples) < self::MAX_SAMPLE_ITEMS) {
+                    $errorSamples[] = [
+                        'sku' => $sku,
+                        'scope' => $scope,
+                        'message' => $exception->getMessage(),
+                    ];
+                }
+            }
+        }
+
+        return [
+            'requested' => $requested,
+            'updated' => $updated,
+            'errors' => $errors,
+            'error_samples' => $errorSamples,
+            'skipped' => $skipped,
+            'skipped_skus' => $skippedSkus,
+        ];
+    }
+
+    /**
      * Create a new product in Cashcow based on the local product data.
      */
     public function createProduct(Product $product): array
@@ -951,6 +1030,44 @@ class CashcowProductPushService
         }
 
         return (int) round((float) $value);
+    }
+
+    /**
+     * @return array<int, array{scope:string,sku:string,qty:int}>
+     */
+    private function buildInventoryItemsForProduct(Product $product): array
+    {
+        $items = [];
+        $seen = [];
+
+        $sku = $this->normalizeSku($product->sku);
+        if ($sku !== '' && !isset($seen[$sku])) {
+            $items[] = [
+                'scope' => 'product',
+                'sku' => $sku,
+                'qty' => $this->normalizeQuantity($product->stock_quantity),
+            ];
+            $seen[$sku] = true;
+        }
+
+        foreach ($product->productVariations as $variation) {
+            $variationSku = $this->normalizeSku($variation->sku);
+            if ($variationSku === '' || isset($seen[$variationSku])) {
+                continue;
+            }
+
+            $items[] = [
+                'scope' => 'variation',
+                'sku' => $variationSku,
+                'qty' => $this->normalizeQuantity(
+                    $variation->inventory,
+                    $this->normalizeQuantity($product->stock_quantity)
+                ),
+            ];
+            $seen[$variationSku] = true;
+        }
+
+        return $items;
     }
 
     private function normalizeSku(?string $sku): string

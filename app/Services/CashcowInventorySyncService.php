@@ -14,7 +14,9 @@ class CashcowInventorySyncService
     protected string $storeId;
     protected int $pageSize;
 
-    public function __construct()
+    public function __construct(
+        protected ToylandInventorySyncService $toylandInventorySyncService
+    )
     {
         $this->baseUrl = rtrim(config('cashcow.base_url'), '/');
         $this->token = (string) config('cashcow.token');
@@ -23,10 +25,16 @@ class CashcowInventorySyncService
     }
 
     /**
-    * Sync inventory and variations from Cashcow API.
-    *
-    * @return array{pages:int,products_updated:int,variations_updated:int,missing_products:array}
-    */
+     * Sync inventory and variations from Cashcow API.
+     *
+     * @return array{
+     *     pages:int,
+     *     products_updated:int,
+     *     variations_updated:int,
+     *     missing_products:array,
+     *     toyland_sync:array{status:string,items_sent:int,error:?string}
+     * }
+     */
     /**
      * @param callable|null $progress optional progress callback accepting an event array
      */
@@ -37,6 +45,7 @@ class CashcowInventorySyncService
         $productsUpdated = 0;
         $variationsUpdated = 0;
         $missing = [];
+        $toylandItems = [];
 
         if (empty($this->token) || empty($this->storeId)) {
             throw new \RuntimeException('CASHCOW_TOKEN or CASHCOW_STORE_ID is not configured.');
@@ -66,21 +75,14 @@ class CashcowInventorySyncService
                     continue;
                 }
 
-                /** @var Product|null $product */
-                $product = Product::where('sku', $sku)->first();
-                if (!$product) {
-                    $missing[] = $sku;
-                    $pageMissing[] = $sku;
-                    continue;
-                }
-
                 $qty = (int) round((float) ($item['qty'] ?? 0));
-                $product->stock_quantity = $qty;
-                $productsUpdated++;
-                $pageProductsUpdated++;
+                $toylandItems[$sku] = [
+                    'sku' => $sku,
+                    'qty' => $qty,
+                ];
 
                 $attributes = $item['attributes'] ?? [];
-                $variationsPayload = [];
+                $remoteVariations = [];
                 foreach ($attributes as $attribute) {
                     $displayName = $attribute['attribute_displayname'] ?? null;
                     $options = $attribute['options'] ?? [];
@@ -95,29 +97,60 @@ class CashcowInventorySyncService
                             ? $qty
                             : (int) round((float) $variationQty);
 
-                        $variation = ProductVariation::updateOrCreate(
-                            [
-                                'product_id' => $product->id,
-                                'sku' => $variationSku,
-                            ],
-                            [
-                                'inventory' => $inventory,
-                                'attributes' => $this->buildVariationAttributes($displayName, $option['option_text'] ?? null),
-                            ]
-                        );
-
-                        $variationsUpdated++;
-                        $pageVariationsUpdated++;
-                        $variationsPayload[] = $variation;
-                        $this->report($progress, [
-                            'type' => 'variation',
-                            'sku' => $sku,
-                            'variation_sku' => $variationSku,
+                        $remoteVariations[] = [
+                            'sku' => $variationSku,
                             'inventory' => $inventory,
-                            'option_text' => $option['option_text'] ?? null,
                             'display_name' => $displayName,
-                        ]);
+                            'option_text' => $option['option_text'] ?? null,
+                        ];
+                        $toylandItems[$variationSku] = [
+                            'sku' => $variationSku,
+                            'qty' => $inventory,
+                        ];
                     }
+                }
+
+                /** @var Product|null $product */
+                $product = Product::where('sku', $sku)->first();
+                if (!$product) {
+                    $missing[] = $sku;
+                    $pageMissing[] = $sku;
+                    continue;
+                }
+
+                $product->stock_quantity = $qty;
+                $productsUpdated++;
+                $pageProductsUpdated++;
+
+                $variationsPayload = [];
+                foreach ($remoteVariations as $remoteVariation) {
+                    $variationSku = $remoteVariation['sku'];
+                    $inventory = $remoteVariation['inventory'];
+                    $variation = ProductVariation::updateOrCreate(
+                        [
+                            'product_id' => $product->id,
+                            'sku' => $variationSku,
+                        ],
+                        [
+                            'inventory' => $inventory,
+                            'attributes' => $this->buildVariationAttributes(
+                                $remoteVariation['display_name'],
+                                $remoteVariation['option_text']
+                            ),
+                        ]
+                    );
+
+                    $variationsUpdated++;
+                    $pageVariationsUpdated++;
+                    $variationsPayload[] = $variation;
+                    $this->report($progress, [
+                        'type' => 'variation',
+                        'sku' => $sku,
+                        'variation_sku' => $variationSku,
+                        'inventory' => $inventory,
+                        'option_text' => $remoteVariation['option_text'],
+                        'display_name' => $remoteVariation['display_name'],
+                    ]);
                 }
 
                 // Update serialized variations column to reflect current variations
@@ -150,11 +183,14 @@ class CashcowInventorySyncService
             usleep(500000); // respect remote API
         }
 
+        $toylandSync = $this->toylandInventorySyncService->sync(array_values($toylandItems));
+
         return [
             'pages' => $pages,
             'products_updated' => $productsUpdated,
             'variations_updated' => $variationsUpdated,
             'missing_products' => array_values(array_unique($missing)),
+            'toyland_sync' => $toylandSync,
         ];
     }
 

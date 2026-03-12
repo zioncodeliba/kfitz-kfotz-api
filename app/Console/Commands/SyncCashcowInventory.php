@@ -76,6 +76,20 @@ class SyncCashcowInventory extends Command
             Log::warning('[Cashcow] Missing SKUs', ['missing' => $result['missing_products']]);
         }
 
+        $toylandSync = $result['toyland_sync'] ?? null;
+        if (is_array($toylandSync) && ($toylandSync['status'] ?? null) !== 'skipped') {
+            $line = sprintf(
+                'Toyland sync %s. Items sent: %d%s',
+                $toylandSync['status'] ?? 'unknown',
+                (int) ($toylandSync['items_sent'] ?? 0),
+                !empty($toylandSync['error']) ? ', Error: ' . $toylandSync['error'] : ''
+            );
+            $this->line($line);
+            $logLines[] = $line;
+            $logMethod = ($toylandSync['status'] ?? null) === 'success' ? 'info' : 'warning';
+            Log::{$logMethod}('[Cashcow] ' . $line);
+        }
+
         $this->sendReport($emailService, $logLines, [
             'status' => 'success',
             'summary' => $summary,

@@ -13,6 +13,7 @@ use App\Models\SystemSetting;
 use App\Services\YpayInvoiceService;
 use App\Services\EmailTemplateService;
 use App\Services\OrderEmailPayloadService;
+use App\Services\ProductInventoryTransitionService;
 use App\Traits\ApiResponse;
 use App\Traits\HandlesPluginPricing;
 use Illuminate\Http\Request;
@@ -26,7 +27,8 @@ class PluginOrderController extends Controller
 
     public function __construct(
         protected EmailTemplateService $emailTemplateService,
-        protected OrderEmailPayloadService $orderEmailPayloadService
+        protected OrderEmailPayloadService $orderEmailPayloadService,
+        protected ProductInventoryTransitionService $productInventoryTransitionService
     ) {
     }
 
@@ -304,6 +306,7 @@ class PluginOrderController extends Controller
             ]);
 
             $productsToRefresh = [];
+            $productStockBefore = [];
 
             foreach ($normalizedItems as $itemData) {
                 /** @var Product $product */
@@ -343,6 +346,9 @@ class PluginOrderController extends Controller
                     'product_data' => $productData,
                 ]);
 
+                if (!array_key_exists($product->id, $productStockBefore)) {
+                    $productStockBefore[$product->id] = (float) ($product->stock_quantity ?? 0);
+                }
                 $product->decrement('stock_quantity', $quantity);
                 if ($variation && $variation->inventory !== null) {
                     $variation->decrement('inventory', $quantity);
@@ -356,6 +362,15 @@ class PluginOrderController extends Controller
             }
 
             DB::commit();
+
+            foreach ($productStockBefore as $productId => $previousStock) {
+                if (isset($productsToRefresh[$productId])) {
+                    $this->productInventoryTransitionService->handleOutOfStockTransition(
+                        $productsToRefresh[$productId],
+                        $previousStock
+                    );
+                }
+            }
 
             Log::info('Plugin order created successfully', [
                 'user_id' => $user->id,

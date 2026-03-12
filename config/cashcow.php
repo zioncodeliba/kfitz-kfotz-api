@@ -5,6 +5,7 @@ return [
     'token' => env('CASHCOW_TOKEN'),
     'store_id' => env('CASHCOW_STORE_ID'),
     'page_size' => env('CASHCOW_PAGE_SIZE', 20),
+    'sync_lead_orders' => env('CASHCOW_SYNC_LEAD_ORDERS', true),
     'notify_email' => env('CASHCOW_NOTIFY_EMAIL'),
     'orders_site_url' => env('CASHCOW_ORDERS_SITE_URL', 'https://www.kfitzkfotz.co.il/'),
     'price_site_id' => env('CASHCOW_PRICE_SITE_ID'),

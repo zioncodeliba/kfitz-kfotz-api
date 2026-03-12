@@ -11,6 +11,7 @@ use App\Models\Shipment;
 use App\Models\User;
 use App\Services\EmailTemplateService;
 use App\Services\OrderEmailPayloadService;
+use App\Services\ProductInventoryTransitionService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -22,17 +23,20 @@ class CashcowOrderSyncService
     protected string $token;
     protected string $storeId;
     protected int $pageSize;
+    protected bool $syncLeadOrders;
     protected string $targetSiteUrl;
 
     public function __construct(
         protected EmailTemplateService $emailTemplateService,
-        protected OrderEmailPayloadService $orderEmailPayloadService
+        protected OrderEmailPayloadService $orderEmailPayloadService,
+        protected ProductInventoryTransitionService $productInventoryTransitionService
     )
     {
         $this->baseUrl = rtrim((string) config('cashcow.base_url'), '/');
         $this->token = (string) config('cashcow.token');
         $this->storeId = (string) config('cashcow.store_id');
         $this->pageSize = (int) config('cashcow.page_size', 20);
+        $this->syncLeadOrders = (bool) config('cashcow.sync_lead_orders', true);
         $this->targetSiteUrl = $this->normalizeUrl((string) config('cashcow.orders_site_url', 'https://www.kfitzkfotz.co.il/'));
     }
 
@@ -86,6 +90,17 @@ class CashcowOrderSyncService
         ];
 
         foreach ($orders as $remoteOrder) {
+            $skipReason = $this->resolveSkipReason($remoteOrder);
+            if ($skipReason !== null) {
+                $summary['skipped']++;
+                $summary['skipped_orders'][] = [
+                    'cashcow_id' => $remoteOrder['Id'] ?? null,
+                    'reason' => $skipReason,
+                ];
+
+                continue;
+            }
+
             try {
                 $result = $this->syncOrder($remoteOrder, $site);
                 if ($result === 'created') {
@@ -114,6 +129,17 @@ class CashcowOrderSyncService
         }
 
         return $summary;
+    }
+
+    protected function resolveSkipReason(array $payload): ?string
+    {
+        $orderStatusId = (int) ($payload['OrderStatus'] ?? 0);
+
+        if (!$this->syncLeadOrders && $this->isLeadOrderStatus($orderStatusId)) {
+            return 'Lead orders are excluded by Cashcow sync configuration.';
+        }
+
+        return null;
     }
 
     protected function fetchPage(int $page, int $pageSize): array
@@ -278,8 +304,9 @@ class CashcowOrderSyncService
         ];
 
         $createdOrder = null;
+        $productStockBefore = [];
 
-        $action = DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, $shipping, &$createdOrder) {
+        $action = DB::transaction(function () use ($orderPayload, $itemsContext, $orderNumber, $orderDate, $shipping, &$createdOrder, &$productStockBefore) {
             $order = Order::where('source', 'cashcow')
                 ->where('source_reference', $orderPayload['source_reference'])
                 ->first();
@@ -342,6 +369,9 @@ class CashcowOrderSyncService
                         'product_data' => $item['product_data'],
                     ]);
 
+                    if (!array_key_exists($item['product']->id, $productStockBefore)) {
+                        $productStockBefore[$item['product']->id] = (float) ($item['product']->stock_quantity ?? 0);
+                    }
                     $item['product']->decrement('stock_quantity', $item['quantity']);
                     if ($item['variation'] && $item['variation']->inventory !== null) {
                         $item['variation']->decrement('inventory', $item['quantity']);
@@ -397,6 +427,15 @@ class CashcowOrderSyncService
 
             return $action;
         });
+
+        if ($action === 'created') {
+            foreach ($productStockBefore as $productId => $previousStock) {
+                $product = Product::find($productId);
+                if ($product) {
+                    $this->productInventoryTransitionService->handleOutOfStockTransition($product, $previousStock);
+                }
+            }
+        }
 
         if ($action === 'created' && $createdOrder) {
             $this->triggerCashcowOrderEvent($createdOrder, $orderStatusId, $shipping, $statusContext);
@@ -633,6 +672,11 @@ class CashcowOrderSyncService
 
         return (string) $order->status === $incomingStatus
             && (string) $order->payment_status === $incomingPaymentStatus;
+    }
+
+    protected function isLeadOrderStatus(int $orderStatus): bool
+    {
+        return $this->mapStatus($orderStatus)['status'] === Order::STATUS_LEAD;
     }
 
     protected function mapStatus(int $orderStatus): array

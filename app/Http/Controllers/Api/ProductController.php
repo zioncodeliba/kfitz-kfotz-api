@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use App\Services\EmailTemplateService;
 use App\Services\CashcowProductPushService;
+use App\Services\ProductInventoryTransitionService;
 
 class ProductController extends Controller
 {
@@ -21,7 +22,8 @@ class ProductController extends Controller
 
     public function __construct(
         protected EmailTemplateService $emailTemplateService,
-        protected CashcowProductPushService $cashcowProductPushService
+        protected CashcowProductPushService $cashcowProductPushService,
+        protected ProductInventoryTransitionService $productInventoryTransitionService
     ) {
     }
 
@@ -165,6 +167,7 @@ class ProductController extends Controller
     {
         $product = Product::findOrFail($id);
         $cashcowSnapshotBefore = $this->buildCashcowSnapshot($product);
+        $stockBeforeUpdate = (float) ($product->stock_quantity ?? 0);
         $wasOutOfStock = $product->stock_quantity <= 0;
         $wasInStock = $product->stock_quantity > 0;
 
@@ -267,7 +270,7 @@ class ProductController extends Controller
             $this->notifyProductBackInStock($product);
         }
         if ($wasInStock && $product->stock_quantity <= 0) {
-            $this->notifyProductOutOfStock($product);
+            $this->productInventoryTransitionService->handleOutOfStockTransition($product, $stockBeforeUpdate);
         }
 
         return $this->successResponse($product, 'Product updated successfully');
