@@ -44,7 +44,14 @@ class ChitaShipmentService
         $destination = is_array($context['destination'] ?? null) ? $context['destination'] : [];
         $consigneeName = $this->sanitizeString($destination['name'] ?? '');
         $city = $this->sanitizeString($destination['city'] ?? '');
-        $street = $this->sanitizeString($destination['street'] ?? '');
+        $streetNumber = $this->sanitizeString($destination['street_number'] ?? ($destination['streetNumber'] ?? ''));
+        $entrance = $this->sanitizeString($destination['entrance'] ?? ($destination['entrance_number'] ?? ($destination['entranceNumber'] ?? '')));
+        $floor = $this->sanitizeString($destination['floor'] ?? ($destination['floor_number'] ?? ($destination['floorNumber'] ?? '')));
+        $apartment = $this->sanitizeString($destination['apartment'] ?? ($destination['apartment_number'] ?? ($destination['apartmentNumber'] ?? '')));
+        $street = $this->normalizeStreetName(
+            $this->sanitizeString($destination['street'] ?? ($destination['address'] ?? '')),
+            $streetNumber
+        );
         $phone = $this->sanitizeString($destination['phone'] ?? '');
         $phone2 = $this->sanitizeString($destination['secondary_phone'] ?? '');
         // $phone = '0504071205';
@@ -84,10 +91,10 @@ class ChitaShipmentService
             ['type' => 'A', 'value' => $city], // P13
             ['type' => 'A', 'value' => ''], // P14
             ['type' => 'A', 'value' => $street], // P15
-            ['type' => 'A', 'value' => ''], // P16
-            ['type' => 'A', 'value' => ''], // P17
-            ['type' => 'A', 'value' => ''], // P18
-            ['type' => 'A', 'value' => ''], // P19
+            ['type' => 'A', 'value' => $streetNumber], // P16
+            ['type' => 'A', 'value' => $entrance], // P17
+            ['type' => 'A', 'value' => $floor], // P18
+            ['type' => 'A', 'value' => $apartment], // P19
             ['type' => 'A', 'value' => $phone], // P20
             ['type' => 'A', 'value' => $phone2], // P21
             ['type' => 'A', 'value' => $reference], // P22
@@ -281,6 +288,23 @@ class ChitaShipmentService
         $text = trim((string) $value);
         $text = str_replace([',', '&'], ' ', $text);
         return $text;
+    }
+
+    private function normalizeStreetName(string $street, string $streetNumber): string
+    {
+        if ($street === '' || $streetNumber === '') {
+            return $street;
+        }
+
+        $quotedStreetNumber = preg_quote($streetNumber, '/');
+        $normalized = preg_replace([
+            '/^\s*' . $quotedStreetNumber . '[\s\-\/]+/u',
+            '/[\s\-\/]+' . $quotedStreetNumber . '\s*$/u',
+        ], '', $street);
+
+        $normalized = trim((string) preg_replace('/\s{2,}/u', ' ', (string) $normalized));
+
+        return $normalized !== '' ? $normalized : $street;
     }
 
     private function formatNumber($value): string
