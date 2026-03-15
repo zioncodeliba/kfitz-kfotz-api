@@ -321,29 +321,13 @@ class CashcowOrderSyncService
                 $action = 'created';
                 $createdOrder = $order;
             } else {
-                // Existing order: skip only when status context is unchanged.
-                if ($this->hasSameStatusContext($order, $orderPayload)) {
+                // Existing order: only sync payment status from Cashcow.
+                if ($this->hasSamePaymentStatus($order, $orderPayload)) {
                     return 'skipped_existing';
                 }
 
-                $incomingMetadata = is_array($orderPayload['source_metadata'] ?? null)
-                    ? $orderPayload['source_metadata']
-                    : [];
-                $existingMetadata = is_array($order->source_metadata)
-                    ? $order->source_metadata
-                    : [];
-
-                // Update only local order status/payment context from Cashcow.
                 $order->fill([
-                    'merchant_customer_id' => $orderPayload['merchant_customer_id'],
-                    'status' => $orderPayload['status'],
                     'payment_status' => $orderPayload['payment_status'],
-                    'source_metadata' => array_merge($existingMetadata, $incomingMetadata),
-                    'invoice_provider' => $orderPayload['invoice_provider'],
-                    'invoice_url' => $orderPayload['invoice_url'],
-                    'shipping_type' => $orderPayload['shipping_type'],
-                    'shipping_method' => $orderPayload['shipping_method'],
-                    'notes' => $orderPayload['notes'],
                 ]);
                 $order->save();
             }
@@ -385,7 +369,7 @@ class CashcowOrderSyncService
                 }
             }
 
-            // If Cashcow marked it as shipped (status 6), ensure we have an active shipment row.
+            // If the local order is already shipped, ensure we have an active shipment row.
             if ($order->status === Order::STATUS_SHIPPED) {
                 $hasShipment = $order->shipment()
                     ->whereIn('status', array_merge(Shipment::ACTIVE_STATUSES, Shipment::FINAL_STATUSES))
@@ -665,13 +649,11 @@ class CashcowOrderSyncService
         ];
     }
 
-    protected function hasSameStatusContext(Order $order, array $orderPayload): bool
+    protected function hasSamePaymentStatus(Order $order, array $orderPayload): bool
     {
-        $incomingStatus = (string) ($orderPayload['status'] ?? '');
         $incomingPaymentStatus = (string) ($orderPayload['payment_status'] ?? '');
 
-        return (string) $order->status === $incomingStatus
-            && (string) $order->payment_status === $incomingPaymentStatus;
+        return (string) $order->payment_status === $incomingPaymentStatus;
     }
 
     protected function isLeadOrderStatus(int $orderStatus): bool
